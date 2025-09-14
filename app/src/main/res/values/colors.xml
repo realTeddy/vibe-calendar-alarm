@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Basic colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Vibe Calendar Alarm Brand Colors -->
+    <color name="vibe_teal">#4ECDC4</color>
+    <color name="vibe_teal_dark">#3DBDB6</color>
+    <color name="vibe_teal_light">#5ED5CD</color>
+    <color name="vibe_orange">#FFB347</color>
+    <color name="vibe_orange_dark">#FF9F33</color>
+    <color name="vibe_gray">#2C3E50</color>
+    <color name="vibe_gray_light">#ECF0F1</color>
+    
+    <!-- Material You Color Tokens - Light Theme (Vibe Calendar Alarm) -->
+    <color name="md_theme_light_primary">#4ECDC4</color>
+    <color name="md_theme_light_onPrimary">#FFFFFF</color>
+    <color name="md_theme_light_primaryContainer">#E8F8F7</color>
+    <color name="md_theme_light_onPrimaryContainer">#2C3E50</color>
+    <color name="md_theme_light_secondary">#FFB347</color>
+    <color name="md_theme_light_onSecondary">#FFFFFF</color>
+    <color name="md_theme_light_secondaryContainer">#FFF4E6</color>
+    <color name="md_theme_light_onSecondaryContainer">#2C3E50</color>
+    <color name="md_theme_light_tertiary">#5ED5CD</color>
+    <color name="md_theme_light_onTertiary">#FFFFFF</color>
+    <color name="md_theme_light_tertiaryContainer">#E8F8F7</color>
+    <color name="md_theme_light_onTertiaryContainer">#2C3E50</color>
+    <color name="md_theme_light_error">#E74C3C</color>
+    <color name="md_theme_light_errorContainer">#FFDAD6</color>
+    <color name="md_theme_light_onError">#FFFFFF</color>
+    <color name="md_theme_light_onErrorContainer">#410002</color>
+    <color name="md_theme_light_background">#FFFBFE</color>
+    <color name="md_theme_light_onBackground">#1B1B1F</color>
+    <color name="md_theme_light_surface">#FFFBFE</color>
+    <color name="md_theme_light_onSurface">#1B1B1F</color>
+    <color name="md_theme_light_surfaceVariant">#E1E2EC</color>
+    <color name="md_theme_light_onSurfaceVariant">#44474F</color>
+    <color name="md_theme_light_outline">#74777F</color>
+    <color name="md_theme_light_inverseOnSurface">#F2F0F4</color>
+    <color name="md_theme_light_inverseSurface">#303033</color>
+    <color name="md_theme_light_inversePrimary">#ADC6FF</color>
+    <color name="md_theme_light_surfaceTint">#1D6BCE</color>
+    <color name="md_theme_light_outlineVariant">#C4C6D0</color>
+    <color name="md_theme_light_scrim">#000000</color>
+</resources>
