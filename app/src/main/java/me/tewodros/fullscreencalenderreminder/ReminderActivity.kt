@@ -2,6 +2,7 @@ package me.tewodros.vibecalendaralarm
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
@@ -34,7 +35,7 @@ import me.tewodros.vibecalendaralarm.viewmodel.ReminderViewModel
  * ReminderActivity displays full-screen alarm notifications for calendar events.
  * * This activity provides an immersive alarm experience with:
  * - Full-screen display that appears over the lock screen
- * - Gradual volume increase (30-second exponential fade-in from 1% to 100%)
+ * - Gradual volume increase (30-second exponential fade-in from 1% to system alarm volume)
  * - Vibration patterns for silent devices
  * - Multiple interaction options: Dismiss, Snooze (5min), Acknowledge
  * - Auto-dismiss after 2 minutes if not interacted with
@@ -42,7 +43,7 @@ import me.tewodros.vibecalendaralarm.viewmodel.ReminderViewModel
  * * Audio Features:
  * - Uses system default alarm sound
  * - Gradual volume fade-in to avoid jarring wake-ups
- * - Respects system volume settings
+ * - Respects system alarm volume (max volume = current alarm volume setting)
  * - Stops audio immediately on any user interaction
  * * UI Features:
  * - Hide system bars for immersive experience
@@ -62,6 +63,8 @@ class ReminderActivity : AppCompatActivity() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
+    private var audioManager: AudioManager? = null
+    private var maxVolumeForAlarm: Float = 1.0f // Will be calculated based on system alarm volume
 
     // Volume fade-in control - Very gradual 30-second fade
     private val volumeFadeHandler = Handler(Looper.getMainLooper())
@@ -168,6 +171,20 @@ class ReminderActivity : AppCompatActivity() {
      * Start alarm sound and vibration with modern APIs
      */
     private fun startAlarmEffects() {
+        // Initialize AudioManager to get system alarm volume
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        // Calculate max volume based on system alarm volume
+        val currentAlarmVolume = audioManager?.getStreamVolume(AudioManager.STREAM_ALARM) ?: 0
+        val maxAlarmVolume = audioManager?.getStreamMaxVolume(AudioManager.STREAM_ALARM) ?: 1
+        maxVolumeForAlarm = if (maxAlarmVolume > 0) {
+            currentAlarmVolume.toFloat() / maxAlarmVolume.toFloat()
+        } else {
+            1.0f
+        }
+
+        Log.d("ReminderActivity", "System alarm volume: $currentAlarmVolume/$maxAlarmVolume (max will be ${(maxVolumeForAlarm * 100).toInt()}%)")
+
         // Modern vibration with better performance
         vibrator?.let { vib ->
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -234,7 +251,7 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     /**
-     * Gradually increase alarm volume from almost silent to full volume over 10 seconds
+     * Gradually increase alarm volume from almost silent to system alarm volume over 30 seconds
      */
     private fun startVolumeGradualIncrease() {
         val totalSteps = (fadeInDurationMs / fadeStepMs).toInt()
@@ -252,7 +269,9 @@ class ReminderActivity : AppCompatActivity() {
                         // Use exponential curve: starts very slowly, accelerates later
                         // This makes the first 15 seconds barely noticeable, then builds more noticeably
                         val curvedProgress = progress * progress // Quadratic curve for gentle start
-                        val volume = 0.01f + (0.99f * curvedProgress) // 0.01 (1%) to 1.0 (100%) range
+
+                        // Scale to system alarm volume: 0.01 (1%) to maxVolumeForAlarm
+                        val volume = 0.01f + ((maxVolumeForAlarm - 0.01f) * curvedProgress)
 
                         // Set volume (left and right channels)
                         player.setVolume(volume, volume)
@@ -268,7 +287,7 @@ class ReminderActivity : AppCompatActivity() {
 
         // Start the fade-in process
         volumeFadeHandler.postDelayed(volumeFadeRunnable!!, fadeStepMs)
-        Log.d("ReminderActivity", "Started 30-second volume fade-in")
+        Log.d("ReminderActivity", "Started 30-second volume fade-in to ${(maxVolumeForAlarm * 100).toInt()}% (system alarm volume)")
     }
 
     /**

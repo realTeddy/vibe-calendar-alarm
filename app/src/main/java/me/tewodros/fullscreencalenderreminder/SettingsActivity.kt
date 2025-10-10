@@ -212,7 +212,7 @@ class SettingsActivity : AppCompatActivity() {
             valueFrom = 0f
             valueTo = 10f
             stepSize = 1f
-            value = 0f // Default value
+            value = 1f // Default to 1 minute before event
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -226,7 +226,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         finalReminderValueText = TextView(this).apply {
-            text = "0 minutes before event"
+            text = "1 minute before event"
             textSize = 14f
             setTextColor(primaryColor)
             gravity = android.view.Gravity.CENTER
@@ -458,7 +458,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun loadSettings() {
         val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
 
-        val finalReminderMinutes = prefs.getInt("final_reminder_minutes", 0)
+        val finalReminderMinutes = prefs.getInt("final_reminder_minutes", 1) // Default to 1 minute before event
         finalReminderSlider.value = finalReminderMinutes.toFloat()
         updateFinalReminderValueText(finalReminderMinutes)
 
@@ -527,7 +527,7 @@ class SettingsActivity : AppCompatActivity() {
          */
         fun getFinalReminderMinutes(context: Context): Int {
             val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-            return prefs.getInt("final_reminder_minutes", 0)
+            return prefs.getInt("final_reminder_minutes", 1) // Default to 1 minute before event
         }
 
         /**

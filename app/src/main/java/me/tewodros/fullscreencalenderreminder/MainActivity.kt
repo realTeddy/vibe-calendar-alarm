@@ -51,6 +51,13 @@ class MainActivity : AppCompatActivity() {
         private const val REQUEST_NOTIFICATION_PERMISSION = 1002
     }
 
+    // Add flag to prevent recursive permission requests
+    private var isRequestingPermissions = false
+    // Track permissions that have been explicitly denied to avoid infinite requests
+    private var calendarPermissionDenied = false
+    // Track if overlay permission dialog has been shown to prevent re-showing
+    private var overlayPermissionDialogShown = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -146,10 +153,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        binding.setupButton.setOnClickListener {
-            scheduleAllReminders()
-        }
-
         binding.refreshButton.setOnClickListener {
             refreshEventsDisplay()
         }
@@ -165,23 +168,46 @@ class MainActivity : AppCompatActivity() {
         binding.permissionsChip.setOnClickListener {
             checkAndRequestPermissions()
         }
-
-        // FAB for quick scheduling all reminders
-        binding.fabScheduleAll.setOnClickListener {
-            scheduleAllReminders()
-        }
     }
 
     private fun checkPermissionsAndInitialize() {
+        // Prevent recursive calls during permission request flow
+        if (isRequestingPermissions) {
+            Log.d("MainActivity", "⏸️ Permission request already in progress, skipping...")
+            return
+        }
+
         when {
-            !hasCalendarPermission() -> requestCalendarPermission()
-            !hasNotificationPermission() -> requestNotificationPermission()
-            !hasAlarmPermission() -> requestAlarmPermission()
-            !hasOverlayPermission() -> requestOverlayPermission()
+            !hasCalendarPermission() && !calendarPermissionDenied -> {
+                isRequestingPermissions = true
+                requestCalendarPermission()
+            }
+            !hasNotificationPermission() -> {
+                isRequestingPermissions = true
+                requestNotificationPermission()
+            }
+            !hasAlarmPermission() -> {
+                isRequestingPermissions = true
+                requestAlarmPermission()
+            }
+            !hasOverlayPermission() -> {
+                isRequestingPermissions = true
+                requestOverlayPermission()
+            }
             else -> {
-                // Check battery optimization after all permissions
-                checkAndOfferBatteryOptimizationFix()
-                initializeApp()
+                // All permissions granted, reset flag and continue
+                isRequestingPermissions = false
+
+                // Check if we have critical permissions
+                if (hasCalendarPermission()) {
+                    // Check battery optimization after all permissions
+                    checkAndOfferBatteryOptimizationFix()
+                    initializeApp()
+                } else {
+                    Log.w("MainActivity", "⚠️ Critical calendar permission missing, cannot continue")
+                    // Show UI to indicate missing critical permissions
+                    // User needs to grant permissions manually
+                }
             }
         }
     }
@@ -232,50 +258,33 @@ class MainActivity : AppCompatActivity() {
      * Check and request all required permissions
      */
     private fun checkAndRequestPermissions() {
+        // Prevent recursive calls during permission request flow
+        if (isRequestingPermissions) {
+            Log.d("MainActivity", "⏸️ Permission request already in progress, skipping...")
+            return
+        }
+
         when {
-            !hasCalendarPermission() -> {
+            !hasCalendarPermission() && !calendarPermissionDenied -> {
+                isRequestingPermissions = true
                 requestCalendarPermission()
             }
             !hasNotificationPermission() -> {
+                isRequestingPermissions = true
                 requestNotificationPermission()
             }
             !hasAlarmPermission() -> {
+                isRequestingPermissions = true
                 requestAlarmPermission()
             }
             else -> {
                 // All permissions granted - no toast needed
+                isRequestingPermissions = false
             }
         }
     }
 
-    private fun scheduleAllReminders() {
-        if (!hasCalendarPermission()) {
-            Toast.makeText(this, "Calendar permission required", Toast.LENGTH_SHORT).show()
-            return
-        }
 
-        lifecycleScope.launch {
-            try {
-                binding.statusText.text = "Scheduling reminders..."
-                calendarManager.scheduleAllReminders()
-                binding.statusText.text = "✅ All reminders scheduled successfully"
-                Toast.makeText(
-                    this@MainActivity,
-                    "🔔 Reminders are ready! You won't miss anything.",
-                    Toast.LENGTH_SHORT,
-                ).show()
-                // Note: Not calling refreshEventsDisplay() to avoid circular calls
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Error scheduling reminders: ${e.message}")
-                binding.statusText.text = "❌ Error scheduling reminders"
-                Toast.makeText(
-                    this@MainActivity,
-                    "Unable to schedule reminders. Please check your calendar permissions.",
-                    Toast.LENGTH_LONG,
-                ).show()
-            }
-        }
-    }
 
     /**
      * Check battery optimization and guide user to whitelist the app
@@ -449,6 +458,15 @@ class MainActivity : AppCompatActivity() {
                 return
             }
 
+            // Don't show dialog if it's already been shown in this session
+            if (overlayPermissionDialogShown) {
+                Log.d("MainActivity", "⏸️ Overlay permission dialog already shown in this session, skipping...")
+                checkPermissionsAndInitialize()
+                return
+            }
+
+            // Mark that we've shown the dialog in this session
+            overlayPermissionDialogShown = true
             // Increment ask count
             prefs.edit().putInt("overlay_ask_count", askCount + 1).apply()
 
@@ -508,24 +526,31 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
+        // Reset the flag when we receive a permission result
+        isRequestingPermissions = false
+
         when (requestCode) {
             REQUEST_CALENDAR_PERMISSION -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.d("MainActivity", "✅ Calendar permission granted")
+                    calendarPermissionDenied = false // Reset the denied flag
+                    // Continue to check next permission only if granted
                     checkPermissionsAndInitialize()
                 } else {
                     Log.e("MainActivity", "❌ Calendar permission denied")
+                    calendarPermissionDenied = true // Mark as denied to prevent loops
                     Toast.makeText(
                         this,
-                        "Calendar permission is required for this app to work",
+                        "Calendar permission is required for this app to work. Please grant it in Settings.",
                         Toast.LENGTH_LONG,
                     ).show()
+                    // Don't continue permission flow - calendar permission is critical
+                    // User needs to grant it manually or restart the app
                 }
             }
             REQUEST_NOTIFICATION_PERMISSION -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.d("MainActivity", "✅ Notification permission granted")
-                    checkPermissionsAndInitialize()
                 } else {
                     Log.e("MainActivity", "❌ Notification permission denied")
                     Toast.makeText(
@@ -533,9 +558,9 @@ class MainActivity : AppCompatActivity() {
                         "Notification permission is required for calendar reminders to work properly. You can enable it later in Settings.",
                         Toast.LENGTH_LONG,
                     ).show()
-                    // Continue anyway but show a warning
-                    checkPermissionsAndInitialize()
                 }
+                // Continue to check next permission (even if denied, as notifications are not critical)
+                checkPermissionsAndInitialize()
             }
         }
     }
@@ -548,26 +573,57 @@ class MainActivity : AppCompatActivity() {
         // This is especially important for overlay permission which is handled in Settings
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             checkPermissionStatusOnResume()
-        }, 500,) // 500ms delay
+        }, 800) // 800ms delay to ensure system has time to register permission changes
     }
 
     private fun checkPermissionStatusOnResume() {
-        // Check if all permissions were granted when returning from settings
-        if (hasAlarmPermission() && hasCalendarPermission() && hasNotificationPermission() && hasOverlayPermission()) {
-            Log.d(
-                "MainActivity",
-                "🔄 All permissions available - triggering auto-scheduling on resume",
-            )
-            refreshEventsDisplay()
-        } else {
-            Log.w("MainActivity", "⚠️ Missing permissions on resume:")
-            Log.w("MainActivity", "  - Calendar: ${hasCalendarPermission()}")
-            Log.w("MainActivity", "  - Alarm: ${hasAlarmPermission()}")
-            Log.w("MainActivity", "  - Notification: ${hasNotificationPermission()}")
-            Log.w("MainActivity", "  - Overlay: ${hasOverlayPermission()}")
+        // Reset permission request flag when returning from system settings
+        isRequestingPermissions = false
 
-            // Recheck permissions if any are missing
-            checkPermissionsAndInitialize()
+        // Reset denied flags if permissions are now granted
+        if (hasCalendarPermission()) {
+            calendarPermissionDenied = false
+        }
+
+        // Check if all permissions were granted when returning from settings
+        val hasCalendar = hasCalendarPermission()
+        val hasAlarm = hasAlarmPermission()
+        val hasNotification = hasNotificationPermission()
+        val hasOverlay = hasOverlayPermission()
+
+        Log.d("MainActivity", "⚡ Permission status check on resume:")
+        Log.d("MainActivity", "  - Calendar: $hasCalendar")
+        Log.d("MainActivity", "  - Alarm: $hasAlarm")
+        Log.d("MainActivity", "  - Notification: $hasNotification")
+        Log.d("MainActivity", "  - Overlay: $hasOverlay")
+
+        if (hasAlarm && hasCalendar && hasNotification && hasOverlay) {
+            Log.d("MainActivity", "🔄 All permissions available - initializing app")
+            // Reset the overlay ask count and dialog flag since permission was granted
+            val prefs = getSharedPreferences("permission_prefs", MODE_PRIVATE)
+            prefs.edit().putInt("overlay_ask_count", 0).apply()
+            overlayPermissionDialogShown = false // Reset dialog flag
+
+            checkAndOfferBatteryOptimizationFix()
+            initializeApp()
+        } else {
+            Log.w("MainActivity", "⚠️ Missing permissions on resume - continuing permission flow")
+            // Only continue permission flow if we're missing critical permissions
+            // Don't show the overlay permission dialog repeatedly if user keeps denying it
+            if (!hasCalendar || !hasAlarm || !hasNotification) {
+                checkPermissionsAndInitialize()
+            } else if (!hasOverlay) {
+                val prefs = getSharedPreferences("permission_prefs", MODE_PRIVATE)
+                val askCount = prefs.getInt("overlay_ask_count", 0)
+                if (askCount < 3 && !overlayPermissionDialogShown) {
+                    Log.d("MainActivity", "🔄 Only overlay permission missing - requesting it")
+                    requestOverlayPermission()
+                } else {
+                    Log.d("MainActivity", "🔄 Overlay permission denied too many times or dialog already shown - continuing without it")
+                    checkAndOfferBatteryOptimizationFix()
+                    initializeApp()
+                }
+            }
         }
     }
 

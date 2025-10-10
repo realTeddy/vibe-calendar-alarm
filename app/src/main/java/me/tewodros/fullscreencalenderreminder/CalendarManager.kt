@@ -20,16 +20,17 @@ import me.tewodros.vibecalendaralarm.model.CalendarEvent
  * CalendarManager handles calendar event retrieval and alarm scheduling.
  * * This class provides functionality to:
  * - Query calendar events from the device's calendar providers
- * - Automatically schedule 1-minute reminders for ALL calendar events
+ * - Schedule configurable reminders for ALL calendar events based on user settings
  * - Handle recurring events properly through the Instances table
  * - Cache calendar data for performance optimization
  * - Manage alarm cleanup for deleted events
  * * Key Features:
- * - Universal 1-minute reminders for all events (regardless of existing reminders)
+ * - Configurable final reminder timing (default: 1 minute before event)
+ * - Respects original event reminders plus adds configurable final reminder
  * - Intelligent caching to reduce database queries
  * - Support for recurring events via CalendarContract.Instances
  * - Automatic cleanup of orphaned alarms
- * - Performance optimized with 2-day lookahead window
+ * - Performance optimized with 30-day lookahead window
  * * @param context The application context for system service access
  */
 class CalendarManager(private val context: Context) {
@@ -55,7 +56,7 @@ class CalendarManager(private val context: Context) {
         private const val MILLIS_PER_SECOND = 1000L
 
         // Alarm scheduling constants
-        private const val DEFAULT_REMINDER_MINUTES = 1 // Default 1-minute reminder for all events
+        private const val DEFAULT_FINAL_REMINDER_MINUTES = 1 // Default final reminder timing
         private const val MAX_ALARM_SCHEDULE_ATTEMPTS = 3 // Retry limit for alarm scheduling
 
         // Audio fade-in constants (used in ReminderActivity)
@@ -135,6 +136,7 @@ class CalendarManager(private val context: Context) {
                 CalendarContract.Instances.CALENDAR_ID,
                 CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
                 CalendarContract.Instances.RRULE, // To identify recurring events
+                CalendarContract.Instances.STATUS, // To filter canceled events
             ),
             null, // No additional WHERE clause needed - time range is in URI
             null,
@@ -150,7 +152,9 @@ class CalendarManager(private val context: Context) {
                 CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
             )
             val rruleIndex = cursor.getColumnIndex(CalendarContract.Instances.RRULE)
+            val statusIndex = cursor.getColumnIndex(CalendarContract.Instances.STATUS)
 
+            var skippedCount = 0
             while (cursor.moveToNext()) {
                 val eventId = cursor.getLong(eventIdIndex)
                 val title = cursor.getString(titleIndex) ?: "Untitled Event"
@@ -158,6 +162,22 @@ class CalendarManager(private val context: Context) {
                 val calendarId = cursor.getLong(calendarIdIndex)
                 val calendarName = cursor.getString(calendarNameIndex) ?: "Unknown Calendar"
                 val rrule = cursor.getString(rruleIndex)
+                val status = cursor.getInt(statusIndex)
+
+                // Skip canceled events (STATUS = 2)
+                // STATUS values: 0=TENTATIVE, 1=CONFIRMED, 2=CANCELED
+                if (status == CalendarContract.Events.STATUS_CANCELED) {
+                    skippedCount++
+                    Log.d("CalendarManager", "⏭ Skipping canceled event: $title (ID: $eventId)")
+                    continue
+                }
+
+                // Check if event is deleted by querying the Events table
+                if (isEventDeleted(eventId)) {
+                    skippedCount++
+                    Log.d("CalendarManager", "⏭ Skipping deleted event: $title (ID: $eventId)")
+                    continue
+                }
 
                 val isRecurring = !rrule.isNullOrEmpty()
 
@@ -177,6 +197,10 @@ class CalendarManager(private val context: Context) {
                 }
 
                 events.add(CalendarEvent(eventId, title, eventStartTime, finalReminderMinutes))
+            }
+
+            if (skippedCount > 0) {
+                Log.d("CalendarManager", "⏭ Skipped $skippedCount canceled or deleted events")
             }
         }
 
@@ -250,6 +274,43 @@ class CalendarManager(private val context: Context) {
             }
 
             Log.d("CalendarManager", "Found $calendarCount calendars ($activeCount active)")
+        }
+    }
+
+    /**
+     * Check if an event has been deleted from the calendar.
+     * Note: Deleted events may still appear in the Instances table temporarily,
+     * so we need to check the Events table directly.
+     *
+     * @param eventId The event ID to check
+     * @return true if the event is deleted or doesn't exist, false otherwise
+     */
+    private fun isEventDeleted(eventId: Long): Boolean {
+        try {
+            val eventCursor: Cursor? = context.contentResolver.query(
+                CalendarContract.Events.CONTENT_URI,
+                arrayOf(CalendarContract.Events.DELETED),
+                "${CalendarContract.Events._ID} = ?",
+                arrayOf(eventId.toString()),
+                null,
+            )
+
+            eventCursor?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val deletedIndex = cursor.getColumnIndex(CalendarContract.Events.DELETED)
+                    val deleted = cursor.getInt(deletedIndex)
+                    return deleted == 1
+                }
+                // Event doesn't exist in Events table - treat as deleted
+                return true
+            }
+
+            // Cursor was null - treat as deleted
+            return true
+        } catch (e: Exception) {
+            Log.e("CalendarManager", "Error checking if event is deleted: ${e.message}")
+            // On error, assume event is not deleted to avoid missing valid events
+            return false
         }
     }
 
