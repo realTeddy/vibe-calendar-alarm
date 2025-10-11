@@ -355,14 +355,14 @@ class ReminderActivity : AppCompatActivity() {
             gravity = android.view.Gravity.CENTER
         }
 
-        // Event title with Material You typography
+        // Event title with Material You typography - Clean, no emoji, bigger and bolder
         val titleText = TextView(this).apply {
             id = View.generateViewId()
-            textSize = 28f
+            textSize = 40f // Increased from 32f for more prominence
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             setTextColor(onSurfaceColor)
             gravity = android.view.Gravity.CENTER
-            setPadding(24, 32, 24, 16)
+            setPadding(32, 48, 32, 16)
             maxLines = 3
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
@@ -370,149 +370,159 @@ class ReminderActivity : AppCompatActivity() {
         // Event time with Material You styling
         val timeText = TextView(this).apply {
             id = View.generateViewId()
-            textSize = 20f
+            textSize = 28f // Increased from 22f for better visibility
+            setTextColor(onSurfaceColor)
+            gravity = android.view.Gravity.CENTER
+            setPadding(24, 8, 24, 8)
+        }
+
+        // Countdown text with Material You styling
+        val countdownText = TextView(this).apply {
+            id = View.generateViewId()
+            textSize = 18f
             setTextColor(onSurfaceVariantColor)
             gravity = android.view.Gravity.CENTER
-            setPadding(24, 8, 24, 48)
+            setPadding(24, 8, 24, 64)
         }
 
         // Action buttons container with Material You styling
         val buttonContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER
-            setPadding(32, 32, 32, 32)
-        }
-
-        // Primary action - Dismiss button with Material You elevated style
-        val dismissButton = com.google.android.material.button.MaterialButton(this).apply {
-            text = "Dismiss Reminder"
-            textSize = 18f
+            setPadding(48, 32, 48, 48)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dpToPx(56), // Standard Material You button height
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+        }
+
+        // Snooze button - Google Clock inspired, large and rounded
+        val snoozeButton = com.google.android.material.button.MaterialButton(this).apply {
+            text = "Snooze"
+            textSize = 20f
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                dpToPx(72), // Bigger button height like Google Clock
+                1f,
             ).apply {
-                setMargins(0, 0, 0, 24)
+                setMargins(0, 0, 12, 0)
             }
-            cornerRadius = 28 // Material You rounded corners
-            iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_TEXT_START
-            icon = ContextCompat.getDrawable(this@ReminderActivity, R.drawable.ic_check_circle_24)
+            cornerRadius = 36 // Fully rounded corners
 
-            // Material You filled button style
-            backgroundTintList = android.content.res.ColorStateList.valueOf(primaryColor)
-            setTextColor(onPrimaryColor)
-            iconTint = android.content.res.ColorStateList.valueOf(onPrimaryColor)
+            // Material You tonal button style
+            backgroundTintList = android.content.res.ColorStateList.valueOf(secondaryContainerColor)
+            setTextColor(onSecondaryContainerColor)
 
-            // Material You elevation
-            elevation = 6f
+            elevation = 0f
             stateListAnimator = android.animation.StateListAnimator()
 
-            iconSize = dpToPx(24)
-            iconPadding = dpToPx(12)
+            setOnClickListener { toggleSnoozeOptions() }
+        }
+
+        // Dismiss button - Google Clock inspired, large and prominent
+        val dismissButton = com.google.android.material.button.MaterialButton(this).apply {
+            text = "Stop"
+            textSize = 20f
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                dpToPx(72), // Bigger button height like Google Clock
+                1f,
+            ).apply {
+                setMargins(12, 0, 0, 0)
+            }
+            cornerRadius = 36 // Fully rounded corners
+
+            // Material You filled button style (primary color for emphasis)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(primaryColor)
+            setTextColor(onPrimaryColor)
+
+            elevation = 2f
+            stateListAnimator = android.animation.StateListAnimator()
+
             setOnClickListener { dismissReminder() }
         }
 
+        buttonContainer.addView(snoozeButton)
         buttonContainer.addView(dismissButton)
 
-        // Show snooze options only if this is the final reminder
-        val eventTimeMs = intent.getLongExtra("event_time", 0)
-        val currentTimeMs = System.currentTimeMillis()
-        val minutesUntilEvent = (eventTimeMs - currentTimeMs) / (1000 * 60)
-
-        // Check if this is a final reminder or very close to event time
-        val isFinalReminder = reminderType.startsWith("FINAL_REMINDER_") || reminderType == "AT_EVENT_TIME" || reminderType == "ONE_MINUTE_BEFORE" || minutesUntilEvent <= 1
-
-        if (isFinalReminder) { // Final reminder - show snooze options
-            // Snooze options container
-            val snoozeContainer = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply {
-                    setMargins(0, 16, 0, 0)
-                }
-            }
-
-            // Snooze header with Material You typography
-            val snoozeHeader = TextView(this).apply {
-                text = "Snooze for:"
-                textSize = 16f
-                typeface = android.graphics.Typeface.create(
-                    "sans-serif-medium",
-                    android.graphics.Typeface.NORMAL,
-                )
-                setTextColor(onSurfaceVariantColor)
-                gravity = android.view.Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply {
-                    setMargins(0, 0, 0, 20)
-                }
-            }
-
-            // First row of snooze buttons
-            val snoozeRow1 = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply {
-                    setMargins(0, 0, 0, 12)
-                }
-            }
-
-            // 5 minutes snooze
-            val snooze5Button = createSnoozeButton("5 min", 5)
-            // 10 minutes snooze
-            val snooze10Button = createSnoozeButton("10 min", 10)
-            // 30 minutes snooze
-            val snooze30Button = createSnoozeButton("30 min", 30)
-
-            snoozeRow1.addView(snooze5Button)
-            snoozeRow1.addView(snooze10Button)
-            snoozeRow1.addView(snooze30Button)
-
-            // Second row of snooze buttons
-            val snoozeRow2 = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                )
-            }
-
-            // 1 hour snooze
-            val snooze1hButton = createSnoozeButton("1 hr", 60)
-            // 2 hours snooze
-            val snooze2hButton = createSnoozeButton("2 hr", 120)
-            // 3 hours snooze
-            val snooze3hButton = createSnoozeButton("3 hr", 180)
-
-            snoozeRow2.addView(snooze1hButton)
-            snoozeRow2.addView(snooze2hButton)
-            snoozeRow2.addView(snooze3hButton)
-
-            snoozeContainer.addView(snoozeHeader)
-            snoozeContainer.addView(snoozeRow1)
-            snoozeContainer.addView(snoozeRow2)
-
-            buttonContainer.addView(snoozeContainer)
+        // Snooze options container (initially hidden)
+        val snoozeOptionsContainer = LinearLayout(this).apply {
+            id = View.generateViewId()
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(48, 0, 48, 32)
+            visibility = View.GONE // Hidden by default
         }
+
+        // Snooze header
+        val snoozeHeader = TextView(this).apply {
+            text = "Snooze for:"
+            textSize = 18f
+            typeface = android.graphics.Typeface.create(
+                "sans-serif-medium",
+                android.graphics.Typeface.NORMAL,
+            )
+            setTextColor(onSurfaceVariantColor)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 24)
+        }
+
+        // First row of snooze options
+        val snoozeRow1 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                setMargins(0, 0, 0, 16)
+            }
+        }
+
+        val snooze5Button = createSnoozeOptionButton("5 min", 5, secondaryContainerColor, onSecondaryContainerColor)
+        val snooze10Button = createSnoozeOptionButton("10 min", 10, secondaryContainerColor, onSecondaryContainerColor)
+        val snooze30Button = createSnoozeOptionButton("30 min", 30, secondaryContainerColor, onSecondaryContainerColor)
+
+        snoozeRow1.addView(snooze5Button)
+        snoozeRow1.addView(snooze10Button)
+        snoozeRow1.addView(snooze30Button)
+
+        // Second row of snooze options
+        val snoozeRow2 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+        }
+
+        val snooze1hButton = createSnoozeOptionButton("1 hr", 60, secondaryContainerColor, onSecondaryContainerColor)
+        val snooze2hButton = createSnoozeOptionButton("2 hr", 120, secondaryContainerColor, onSecondaryContainerColor)
+        val snooze3hButton = createSnoozeOptionButton("3 hr", 180, secondaryContainerColor, onSecondaryContainerColor)
+
+        snoozeRow2.addView(snooze1hButton)
+        snoozeRow2.addView(snooze2hButton)
+        snoozeRow2.addView(snooze3hButton)
+
+        snoozeOptionsContainer.addView(snoozeHeader)
+        snoozeOptionsContainer.addView(snoozeRow1)
+        snoozeOptionsContainer.addView(snoozeRow2)
 
         // Assemble the layout
         layout.addView(titleText)
         layout.addView(timeText)
+        layout.addView(countdownText)
         layout.addView(buttonContainer)
+        layout.addView(snoozeOptionsContainer)
 
         setContentView(layout)
 
         // Store references for later use
         findViewById<TextView>(titleText.id).tag = "title"
         findViewById<TextView>(timeText.id).tag = "time"
+        findViewById<TextView>(countdownText.id).tag = "countdown"
+        findViewById<LinearLayout>(snoozeOptionsContainer.id).tag = "snoozeOptions"
     }
 
     /**
@@ -534,33 +544,81 @@ class ReminderActivity : AppCompatActivity() {
             .findViewWithTag<TextView>("title")
         val timeTextView = findViewById<View>(android.R.id.content)
             .findViewWithTag<TextView>("time")
+        val countdownTextView = findViewById<View>(android.R.id.content)
+            .findViewWithTag<TextView>("countdown")
 
-        // Include alarm type in the title display
-        val displayTitle = when {
-            reminderType.startsWith("FINAL_REMINDER_") -> {
-                val minutes = reminderType.substringAfter("FINAL_REMINDER_").substringBefore("MIN")
-                "🚨 FINAL REMINDER ($minutes min): $eventTitle"
+        // Display clean event title without emoji or reminder type
+        titleTextView?.text = eventTitle
+
+        // Format and display event time
+        val actualEventTime = if (eventStartTime > 0) {
+            eventStartTime
+        } else {
+            // For test reminders, use current time + 1 minute as fallback
+            intent.getLongExtra("event_time", System.currentTimeMillis() + 60000)
+        }
+
+        if (actualEventTime > 0) {
+            val currentTime = System.currentTimeMillis()
+            val eventDate = Date(actualEventTime)
+            val currentDate = Date(currentTime)
+
+            // Check if event is today
+            val eventCalendar = Calendar.getInstance().apply { time = eventDate }
+            val currentCalendar = Calendar.getInstance().apply { time = currentDate }
+
+            val isToday = eventCalendar.get(Calendar.YEAR) == currentCalendar.get(Calendar.YEAR) &&
+                         eventCalendar.get(Calendar.DAY_OF_YEAR) == currentCalendar.get(Calendar.DAY_OF_YEAR)
+
+            // Format time based on whether it's today
+            val timeFormat = if (isToday) {
+                SimpleDateFormat("h:mm a", Locale.getDefault())
+            } else {
+                SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault())
             }
-            reminderType == "AT_EVENT_TIME" -> "🚨 EVENT NOW: $eventTitle"
-            reminderType == "ONE_MINUTE_BEFORE" -> "🚨 1-MIN BEFORE: $eventTitle"
-            reminderType == "TEST" -> "🧪 TEST: $eventTitle"
+            timeTextView?.text = timeFormat.format(eventDate)
+
+            // Calculate and display countdown
+            val timeDiffMillis = actualEventTime - currentTime
+            val countdownText = formatCountdown(timeDiffMillis)
+            countdownTextView?.text = countdownText
+        } else {
+            timeTextView?.text = "No time specified"
+            countdownTextView?.text = ""
+        }
+    }
+
+    /**
+     * Format time difference into a human-readable countdown
+     */
+    private fun formatCountdown(timeDiffMillis: Long): String {
+        val absTimeDiff = Math.abs(timeDiffMillis)
+        val isPast = timeDiffMillis < 0
+
+        val seconds = absTimeDiff / 1000
+        val minutes = seconds / 60
+        val hours = minutes / 60
+        val days = hours / 24
+
+        val countdownStr = when {
+            days > 0 -> {
+                if (days == 1L) "1 day" else "$days days"
+            }
+            hours > 0 -> {
+                if (hours == 1L) "1 hour" else "$hours hours"
+            }
+            minutes > 0 -> {
+                if (minutes == 1L) "1 minute" else "$minutes minutes"
+            }
             else -> {
-                if (reminderType.startsWith("ORIGINAL_")) {
-                    val index = reminderType.substringAfter("ORIGINAL_").toIntOrNull()
-                    "🔔 REMINDER #${(index ?: 0) + 1}: $eventTitle"
-                } else {
-                    "🔔 REMINDER: $eventTitle"
-                }
+                "less than a minute"
             }
         }
 
-        titleTextView?.text = displayTitle
-
-        if (eventStartTime > 0) {
-            val dateFormat = SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault())
-            timeTextView?.text = dateFormat.format(Date(eventStartTime))
+        return if (isPast) {
+            "Started $countdownStr ago"
         } else {
-            timeTextView?.text = "No time specified"
+            "Starts in $countdownStr"
         }
     }
 
@@ -574,7 +632,58 @@ class ReminderActivity : AppCompatActivity() {
     }
 
     /**
-     * Helper method to create snooze buttons with Material You design
+     * Toggle snooze options visibility
+     */
+    private fun toggleSnoozeOptions() {
+        val snoozeOptionsContainer = findViewById<View>(android.R.id.content)
+            .findViewWithTag<LinearLayout>("snoozeOptions")
+
+        snoozeOptionsContainer?.let { container ->
+            if (container.visibility == View.GONE) {
+                container.visibility = View.VISIBLE
+            } else {
+                container.visibility = View.GONE
+            }
+        }
+    }
+
+    /**
+     * Helper method to create snooze option buttons with Material You design
+     */
+    private fun createSnoozeOptionButton(
+        text: String,
+        minutes: Int,
+        backgroundColor: Int,
+        textColor: Int
+    ): com.google.android.material.button.MaterialButton {
+        return com.google.android.material.button.MaterialButton(
+            this,
+            null,
+            com.google.android.material.R.attr.materialButtonOutlinedStyle,
+        ).apply {
+            this.text = text
+            textSize = 16f
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                dpToPx(56),
+                1f,
+            ).apply {
+                val margin = dpToPx(8)
+                setMargins(margin, 0, margin, 0)
+            }
+
+            cornerRadius = 28
+            backgroundTintList = android.content.res.ColorStateList.valueOf(backgroundColor)
+            setTextColor(textColor)
+            elevation = 0f
+            isAllCaps = false
+
+            setOnClickListener { snoozeReminder(minutes) }
+        }
+    }
+
+    /**
+     * Helper method to create snooze buttons with Material You design (deprecated - keeping for compatibility)
      */
     private fun createSnoozeButton(text: String, minutes: Int): com.google.android.material.button.MaterialButton {
         // Get theme colors
