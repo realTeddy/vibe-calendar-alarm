@@ -423,8 +423,21 @@ class SettingsActivity : AppCompatActivity() {
             setOnClickListener { test1MinuteReminder() }
         }
 
+        val testMultipleButton = MaterialButton(this).apply {
+            text = "Test Multiple Events (3)"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                setMargins(0, 0, 0, 8)
+            }
+            cornerRadius = 12
+            setOnClickListener { testMultipleEvents() }
+        }
+
         testButtonsContainer.addView(testImmediateButton)
         testButtonsContainer.addView(test1MinButton)
+        testButtonsContainer.addView(testMultipleButton)
 
         // Update test buttons visibility when debug mode changes
         debugModeSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -497,13 +510,25 @@ class SettingsActivity : AppCompatActivity() {
      * Test immediate reminder
      */
     private fun testImmediateReminder() {
-        val intent = Intent(this, ReminderActivity::class.java).apply {
-            putExtra("event_title", "Test Event - Immediate")
-            putExtra("event_time", System.currentTimeMillis())
-            putExtra("reminder_type", "TEST")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        // Create a pending alarm and add it to the queue
+        val pendingAlarm = me.tewodros.vibecalendaralarm.PendingAlarmsManager.PendingAlarm(
+            eventId = System.currentTimeMillis(), // Use timestamp as unique ID for test
+            eventTitle = "Test Event - Immediate",
+            eventStartTime = System.currentTimeMillis(),
+            reminderType = "TEST"
+        )
+
+        // Add to queue
+        me.tewodros.vibecalendaralarm.PendingAlarmsManager.addAlarm(pendingAlarm)
+
+        // Launch activity if not already active
+        if (!me.tewodros.vibecalendaralarm.PendingAlarmsManager.isActivityActive()) {
+            val intent = Intent(this, ReminderActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+            }
+            startActivity(intent)
         }
-        startActivity(intent)
+
         Toast.makeText(this, "Test reminder launched", Toast.LENGTH_SHORT).show()
     }
 
@@ -511,14 +536,61 @@ class SettingsActivity : AppCompatActivity() {
      * Test 1-minute reminder
      */
     private fun test1MinuteReminder() {
-        val intent = Intent(this, ReminderActivity::class.java).apply {
-            putExtra("event_title", "Test Event - 1 Minute")
-            putExtra("event_time", System.currentTimeMillis() + 60000) // 1 minute from now
-            putExtra("reminder_type", "ONE_MINUTE_BEFORE")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        // Create a pending alarm and add it to the queue
+        val pendingAlarm = me.tewodros.vibecalendaralarm.PendingAlarmsManager.PendingAlarm(
+            eventId = System.currentTimeMillis() + 1, // Use timestamp + 1 as unique ID for test
+            eventTitle = "Test Event - 1 Minute",
+            eventStartTime = System.currentTimeMillis() + 60000, // 1 minute from now
+            reminderType = "ONE_MINUTE_BEFORE"
+        )
+
+        // Add to queue
+        me.tewodros.vibecalendaralarm.PendingAlarmsManager.addAlarm(pendingAlarm)
+
+        // Launch activity if not already active
+        if (!me.tewodros.vibecalendaralarm.PendingAlarmsManager.isActivityActive()) {
+            val intent = Intent(this, ReminderActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+            }
+            startActivity(intent)
         }
-        startActivity(intent)
+
         Toast.makeText(this, "1-minute test reminder launched", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * Test multiple simultaneous events
+     */
+    private fun testMultipleEvents() {
+        val baseTime = System.currentTimeMillis()
+
+        // Create 3 test events
+        val events = listOf(
+            Triple("Team Meeting", baseTime + 5000, "FIVE_MINUTES_BEFORE"),
+            Triple("Doctor Appointment", baseTime + 10000, "TEN_MINUTES_BEFORE"),
+            Triple("Lunch with Client", baseTime + 15000, "FIFTEEN_MINUTES_BEFORE")
+        )
+
+        // Add all events to the queue
+        events.forEachIndexed { index, (title, startTime, type) ->
+            val pendingAlarm = me.tewodros.vibecalendaralarm.PendingAlarmsManager.PendingAlarm(
+                eventId = baseTime + index + 100, // Unique IDs
+                eventTitle = title,
+                eventStartTime = startTime,
+                reminderType = type
+            )
+            me.tewodros.vibecalendaralarm.PendingAlarmsManager.addAlarm(pendingAlarm)
+        }
+
+        // Launch activity if not already active
+        if (!me.tewodros.vibecalendaralarm.PendingAlarmsManager.isActivityActive()) {
+            val intent = Intent(this, ReminderActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+            }
+            startActivity(intent)
+        }
+
+        Toast.makeText(this, "3 test events added to queue", Toast.LENGTH_SHORT).show()
     }
 
     companion object {
