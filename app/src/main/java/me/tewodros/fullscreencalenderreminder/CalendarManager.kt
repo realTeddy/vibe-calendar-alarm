@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.*
 import me.tewodros.vibecalendaralarm.model.CalendarEvent
+import me.tewodros.vibecalendaralarm.wear.WearCommunicationManager
 
 /**
  * CalendarManager handles calendar event retrieval and alarm scheduling.
@@ -32,8 +33,12 @@ import me.tewodros.vibecalendaralarm.model.CalendarEvent
  * - Automatic cleanup of orphaned alarms
  * - Performance optimized with 30-day lookahead window
  * * @param context The application context for system service access
+ * @param wearCommunicationManager Manager for syncing reminders to Wear OS devices (optional)
  */
-class CalendarManager(private val context: Context) {
+class CalendarManager(
+    private val context: Context,
+    private val wearCommunicationManager: WearCommunicationManager? = null
+) {
 
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -565,6 +570,16 @@ class CalendarManager(private val context: Context) {
                         "CalendarManager",
                         "✅ VERIFICATION SUCCESS: $type alarm is registered in system (attempt $attempt)",
                     )
+
+                    // Sync to Wear OS devices if available
+                    wearCommunicationManager?.syncReminderToWear(
+                        eventId = event.id,
+                        eventTitle = event.title,
+                        eventStartTime = event.startTime,
+                        reminderTime = reminderTime
+                    )
+                    Log.d("CalendarManager", "📱 Synced reminder to Wear OS devices")
+
                     if (attempt == 1) {
                         Toast.makeText(
                             context,
@@ -701,8 +716,23 @@ class CalendarManager(private val context: Context) {
             if (allAlarmsScheduled) {
                 Log.d(
                     "CalendarManager",
-                    "⏭ All alarms already scheduled for: ${event.title} - skipping",
+                    "⏭ All alarms already scheduled for: ${event.title} - syncing to Wear",
                 )
+
+                // Sync to Wear OS devices even if phone alarms are already scheduled
+                event.reminderMinutes.forEach { minutes ->
+                    val reminderTime = event.startTime - (minutes * 60 * 1000)
+                    if (reminderTime > currentTime) {
+                        wearCommunicationManager?.syncReminderToWear(
+                            eventId = event.id,
+                            eventTitle = event.title,
+                            eventStartTime = event.startTime,
+                            reminderTime = reminderTime
+                        )
+                    }
+                }
+                Log.d("CalendarManager", "📱 Synced ${event.reminderMinutes.size} reminders to Wear")
+
                 alreadyScheduledCount++
                 return@forEach
             }

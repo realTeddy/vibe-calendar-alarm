@@ -150,6 +150,10 @@ dependencies {
     implementation("androidx.fragment:fragment-ktx:1.8.1")
     implementation("androidx.activity:activity-ktx:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
+    // Wearable Data Layer for watch communication
+    implementation("com.google.android.gms:play-services-wearable:18.1.0")
 
     // Hilt for dependency injection
     implementation("com.google.dagger:hilt-android:2.48")

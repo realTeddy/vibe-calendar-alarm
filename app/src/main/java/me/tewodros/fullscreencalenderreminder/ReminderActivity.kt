@@ -30,6 +30,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.launch
 import me.tewodros.vibecalendaralarm.repository.CalendarRepository
 import me.tewodros.vibecalendaralarm.viewmodel.ReminderViewModel
+import me.tewodros.vibecalendaralarm.wear.WearCommunicationManager
 
 /**
  * ReminderActivity displays full-screen alarm notifications for calendar events.
@@ -58,6 +59,9 @@ class ReminderActivity : AppCompatActivity() {
 
     @Inject
     lateinit var calendarRepository: CalendarRepository
+
+    @Inject
+    lateinit var wearCommunicationManager: WearCommunicationManager
 
     private lateinit var viewModel: ReminderViewModel
 
@@ -627,6 +631,11 @@ class ReminderActivity : AppCompatActivity() {
      */
     private fun dismissReminder() {
         stopAlarmEffects()
+
+        // Notify Wear OS devices that reminder was dismissed on phone
+        wearCommunicationManager.notifyWearOfDismissal(eventId)
+        Log.d("ReminderActivity", "📱 Notified Wear OS of dismissal")
+
         Toast.makeText(this, "Reminder dismissed", Toast.LENGTH_SHORT).show()
         finish()
     }

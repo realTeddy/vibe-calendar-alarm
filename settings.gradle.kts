@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Full Screen Calender Reminder"
 include(":app")
- 
+include(":wear")

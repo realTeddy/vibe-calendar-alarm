@@ -4,25 +4,25 @@
 
     <!-- Required to read calendar events and reminders -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
-    
+
     <!-- Required for notifications on Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    
+
     <!-- Required to schedule exact alarms for reminders -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    
+
     <!-- Required to show full-screen alerts over other apps -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    
+
     <!-- Required to request battery optimization exemption -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    
+
     <!-- Required to wake device from sleep for alarms -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    
+
     <!-- Required for vibration -->
     <uses-permission android:name="android.permission.VIBRATE" />
-    
+
     <!-- Required for background service to auto-start on boot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
@@ -36,7 +36,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.FullScreenCalenderReminder">
-        
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -47,7 +47,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        
+
         <!-- Full-screen reminder activity -->
         <activity
             android:name=".ReminderActivity"
@@ -57,20 +57,20 @@
             android:excludeFromRecents="true"
             android:showOnLockScreen="true"
             android:turnScreenOn="true" />
-            
+
         <!-- Settings activity -->
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.FullScreenCalenderReminder"
             android:parentActivityName=".MainActivity" />
-        
+
         <!-- Receiver for alarm broadcasts -->
-        <receiver 
+        <receiver
             android:name=".AlarmReceiver"
             android:enabled="true"
             android:exported="false" />
-            
+
         <!-- Receiver for boot completed to start background service -->
         <receiver
             android:name=".BootReceiver"
@@ -83,7 +83,31 @@
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>
-            
+
+        <!-- Receiver for syncing calendar to Wear OS devices -->
+        <receiver
+            android:name=".receiver.WearSyncReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="me.tewodros.vibecalendaralarm.SYNC_TO_WEAR" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Service to receive messages from Wear OS devices -->
+        <service
+            android:name=".wear.PhoneWearListenerService"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
+
         <!-- Disable default WorkManager initialization since we use Configuration.Provider -->
         <provider
             android:name="androidx.startup.InitializationProvider"
@@ -95,7 +119,7 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
-            
+
     </application>
 
 </manifest>

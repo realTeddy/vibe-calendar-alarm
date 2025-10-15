@@ -65,7 +65,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Initialize CalendarManager (proven working approach)
+        // Initialize CalendarManager without Wear support for now
+        // (Wear sync happens via ReminderActivity which uses Hilt injection)
         calendarManager = CalendarManager(this)
 
         // Setup RecyclerView

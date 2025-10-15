@@ -18,9 +18,14 @@
 
 **Full Screen Calendar Reminder** is a lightweight Android application that ensures you never miss important calendar events by providing reliable, impossible-to-miss full-screen reminders. Unlike traditional calendar notifications that can be easily dismissed or overlooked, this app creates immersive alert experiences that capture your full attention.
 
+### 🎉 NEW: Wear OS Support!
+The app now supports **full-screen reminders on Wear OS watches**! Get the same un-missable alerts on your wrist with automatic synchronization between your phone and watch. [Learn more →](WEAR_OS_SETUP.md)
+
 ### Key Highlights
 - 🔔 **Universal Reminders**: Automatically adds 1-minute reminders to ALL calendar events
 - 📱 **Full-Screen Alerts**: Immersive reminders that display over the lock screen
+- ⌚ **Wear OS Support**: Full-screen reminders on your smartwatch (NEW!)
+- 🔄 **Bidirectional Sync**: Dismiss on phone or watch - syncs automatically
 - 🔊 **Gradual Audio**: 30-second fade-in from 1% to 100% volume for gentle awakening
 - 🔄 **Smart Background Monitoring**: Continuous monitoring with 1-minute intervals
 - 📅 **Multi-Calendar Support**: Works with Google Calendar, Exchange, and all calendar providers
@@ -31,6 +36,7 @@
 ### Core Functionality
 - **Automatic Reminder Addition**: Adds 1-minute reminders to ALL calendar events, regardless of existing reminder settings
 - **Full-Screen Alert Display**: Shows immersive, lock-screen-friendly reminders with event details
+- **Wear OS Integration**: Full-screen reminders on your smartwatch with automatic sync (NEW!)
 - **Background Event Monitoring**: Uses WorkManager for reliable background execution every minute
 - **Multi-Calendar Integration**: Automatically detects and works with all calendar accounts on your device
 - **Recurring Event Support**: Properly handles repeating events through Android's CalendarContract.Instances API
@@ -38,6 +44,7 @@
 
 ### User Experience
 - **Gradual Audio Alerts**: 30-second volume fade-in from 1% to 100% to avoid jarring wake-ups
+- **Bidirectional Sync**: Dismiss reminders on phone or watch - automatically syncs to both devices
 - **Smart Permission Management**: Guided permission flow with user-friendly explanations
 - **Battery Optimization Awareness**: Helps users exempt the app from battery optimization for reliable operation
 - **Real-time Event Display**: Shows upcoming events with reminder status in an intuitive list
@@ -356,6 +363,18 @@ All calendar data remains private and local to your device.
 - **Issues**: Report bugs or request features via [GitHub Issues](../../issues)
 - **Discussions**: General questions in [GitHub Discussions](../../discussions)
 - **Email**: [CONTACT-EMAIL@example.com](mailto:CONTACT-EMAIL@example.com)
+
+## 📚 Documentation
+
+- [🏗️ Architecture](ARCHITECTURE.md) - Technical architecture and design patterns
+- [🤝 Contributing](CONTRIBUTING.md) - Contribution guidelines
+- [🏗️ Build Guide](BUILD.md) - Build and release instructions
+- [🚀 CI/CD Guide](CI_CD_GUIDE.md) - CI/CD setup
+- [🛡️ Security](SECURITY.md) - Security policy
+- [📜 Privacy Policy](PRIVACY.md) - Privacy practices
+- [📦 Google Play Deployment](GOOGLE_PLAY_DEPLOYMENT.md) - Play Store guide
+- [⌚ Wear OS Setup](WEAR_OS_SETUP.md) - **NEW!** Wear OS integration
+- [📱 Wear OS Quick Reference](WEAR_OS_QUICK_REFERENCE.md) - **NEW!** Quick commands
 
 ## Acknowledgments
 

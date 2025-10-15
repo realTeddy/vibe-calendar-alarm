@@ -7,8 +7,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import me.tewodros.vibecalendaralarm.CalendarManager
 import me.tewodros.vibecalendaralarm.repository.CalendarRepository
 import me.tewodros.vibecalendaralarm.repository.CalendarRepositoryImpl
+import me.tewodros.vibecalendaralarm.wear.WearCommunicationManager
 
 /**
  * Hilt module for providing application-wide dependencies
@@ -27,5 +29,17 @@ object AppModule {
         @ApplicationContext context: Context,
     ): CalendarRepository {
         return CalendarRepositoryImpl(context)
+    }
+
+    /**
+     * Provides singleton instance of CalendarManager with Wear sync support
+     */
+    @Provides
+    @Singleton
+    fun provideCalendarManager(
+        @ApplicationContext context: Context,
+        wearCommunicationManager: WearCommunicationManager
+    ): CalendarManager {
+        return CalendarManager(context, wearCommunicationManager)
     }
 }

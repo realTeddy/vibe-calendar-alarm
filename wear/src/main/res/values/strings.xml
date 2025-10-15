@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vibe Calendar Alarm</string>
+    <string name="reminder_title">Calendar Reminder</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="snooze">Snooze</string>
+    <string name="syncing">Syncing with phone…</string>
+    <string name="no_reminders">No upcoming reminders</string>
+    <string name="waiting_for_phone">Waiting for phone connection…</string>
+</resources>
