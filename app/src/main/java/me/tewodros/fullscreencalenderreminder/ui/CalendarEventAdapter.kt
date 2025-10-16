@@ -41,6 +41,12 @@ class CalendarEventAdapter : ListAdapter<CalendarEvent, CalendarEventAdapter.Eve
             binding.eventTitle.text = event.title
             binding.eventTime.text = dateFormat.format(Date(event.startTime))
 
+            // Update countdown text
+            binding.countdownText.text = formatCountdown(event.startTime)
+
+            // Update calendar name
+            binding.calendarName.text = "📅 ${event.calendarName}"
+
             // Update reminder chip
             val reminderText = when {
                 event.reminderMinutes.isEmpty() -> "No reminders"
@@ -54,6 +60,48 @@ class CalendarEventAdapter : ListAdapter<CalendarEvent, CalendarEventAdapter.Eve
                 android.view.View.VISIBLE
             } else {
                 android.view.View.GONE
+            }
+        }
+
+        /**
+         * Format countdown to event start time (same as ReminderActivity)
+         */
+        private fun formatCountdown(eventStartTime: Long): String {
+            val currentTime = System.currentTimeMillis()
+            val diffMs = eventStartTime - currentTime
+
+            return when {
+                diffMs < 0 -> {
+                    val pastMs = -diffMs
+                    when {
+                        pastMs < 60_000 -> "Started just now"
+                        pastMs < 3600_000 -> {
+                            val minutes = (pastMs / 60_000).toInt()
+                            "Started $minutes minute${if (minutes == 1) "" else "s"} ago"
+                        }
+                        pastMs < 86400_000 -> {
+                            val hours = (pastMs / 3600_000).toInt()
+                            "Started $hours hour${if (hours == 1) "" else "s"} ago"
+                        }
+                        else -> {
+                            val days = (pastMs / 86400_000).toInt()
+                            "Started $days day${if (days == 1) "" else "s"} ago"
+                        }
+                    }
+                }
+                diffMs < 60_000 -> "Starting now"
+                diffMs < 3600_000 -> {
+                    val minutes = (diffMs / 60_000).toInt()
+                    "Starting in $minutes minute${if (minutes == 1) "" else "s"}"
+                }
+                diffMs < 86400_000 -> {
+                    val hours = (diffMs / 3600_000).toInt()
+                    "Starting in $hours hour${if (hours == 1) "" else "s"}"
+                }
+                else -> {
+                    val days = (diffMs / 86400_000).toInt()
+                    "Starting in $days day${if (days == 1) "" else "s"}"
+                }
             }
         }
     }

@@ -196,7 +196,7 @@ class CalendarManager(private val context: Context) {
                     updatedReminders
                 }
 
-                events.add(CalendarEvent(eventId, title, eventStartTime, finalReminderMinutes))
+                events.add(CalendarEvent(eventId, title, eventStartTime, finalReminderMinutes, calendarName))
             }
 
             if (skippedCount > 0) {
@@ -483,6 +483,7 @@ class CalendarManager(private val context: Context) {
                 putExtra("event_id", event.id)
                 putExtra("event_title", event.title)
                 putExtra("event_start_time", event.startTime)
+                putExtra("calendar_name", event.calendarName)
                 putExtra("reminder_type", type) // Add type for receiver to handle differently if needed
 
                 // Add action to make intent unique and help with debugging
@@ -554,6 +555,7 @@ class CalendarManager(private val context: Context) {
                         putExtra("event_id", event.id)
                         putExtra("event_title", event.title)
                         putExtra("event_start_time", event.startTime)
+                        putExtra("calendar_name", event.calendarName)
                         putExtra("reminder_type", type)
                         action = "REMINDER_ALARM_${event.id}_$type"
                     },

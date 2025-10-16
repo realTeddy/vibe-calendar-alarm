@@ -19,12 +19,13 @@ class AlarmReceiver : BroadcastReceiver() {
         val eventId = intent.getLongExtra("event_id", -1)
         val eventTitle = intent.getStringExtra("event_title") ?: "Reminder"
         val eventStartTime = intent.getLongExtra("event_start_time", 0)
+        val calendarName = intent.getStringExtra("calendar_name") ?: "Unknown Calendar"
         val reminderType = intent.getStringExtra("reminder_type") ?: "UNKNOWN"
         val action = intent.action ?: "NO_ACTION"
 
         Log.d(
             "AlarmReceiver",
-            "Event details: ID=$eventId, Title='$eventTitle', StartTime=$eventStartTime",
+            "Event details: ID=$eventId, Title='$eventTitle', StartTime=$eventStartTime, Calendar='$calendarName'",
         )
         Log.d("AlarmReceiver", "Alarm type: $reminderType, Action: $action")
         Log.d("AlarmReceiver", "Current time: ${System.currentTimeMillis()}")
@@ -34,7 +35,8 @@ class AlarmReceiver : BroadcastReceiver() {
             eventId = eventId,
             eventTitle = eventTitle,
             eventStartTime = eventStartTime,
-            reminderType = reminderType
+            reminderType = reminderType,
+            calendarName = calendarName
         )
 
         // Add to pending alarms queue

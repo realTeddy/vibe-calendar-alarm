@@ -172,7 +172,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // Section header
         val headerText = TextView(this).apply {
-            text = "⏰ Reminder Settings"
+            text = "Reminder Settings"
             textSize = 20f
             setTextColor(onSurfaceColor)
             layoutParams = LinearLayout.LayoutParams(
@@ -270,7 +270,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // Section header
         val headerText = TextView(this).apply {
-            text = "🛠️ Developer Options"
+            text = "Developer Options"
             textSize = 20f
             setTextColor(onSurfaceColor)
             layoutParams = LinearLayout.LayoutParams(
@@ -349,7 +349,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         val screenshotTitle = TextView(this).apply {
-            text = "📸 Screenshot Mode"
+            text = "Screenshot Mode"
             textSize = 16f
             setTextColor(onSurfaceColor)
         }
@@ -407,7 +407,7 @@ class SettingsActivity : AppCompatActivity() {
             ).apply {
                 setMargins(0, 8, 0, 8)
             }
-            cornerRadius = 12
+            // cornerRadius inherited from global style
             setOnClickListener { testImmediateReminder() }
         }
 
@@ -419,7 +419,7 @@ class SettingsActivity : AppCompatActivity() {
             ).apply {
                 setMargins(0, 0, 0, 8)
             }
-            cornerRadius = 12
+            // cornerRadius inherited from global style
             setOnClickListener { test1MinuteReminder() }
         }
 
@@ -431,7 +431,7 @@ class SettingsActivity : AppCompatActivity() {
             ).apply {
                 setMargins(0, 0, 0, 8)
             }
-            cornerRadius = 12
+            // cornerRadius inherited from global style
             setOnClickListener { testMultipleEvents() }
         }
 
@@ -515,7 +515,8 @@ class SettingsActivity : AppCompatActivity() {
             eventId = System.currentTimeMillis(), // Use timestamp as unique ID for test
             eventTitle = "Test Event - Immediate",
             eventStartTime = System.currentTimeMillis(),
-            reminderType = "TEST"
+            reminderType = "TEST",
+            calendarName = "Test Calendar"
         )
 
         // Add to queue
@@ -541,7 +542,8 @@ class SettingsActivity : AppCompatActivity() {
             eventId = System.currentTimeMillis() + 1, // Use timestamp + 1 as unique ID for test
             eventTitle = "Test Event - 1 Minute",
             eventStartTime = System.currentTimeMillis() + 60000, // 1 minute from now
-            reminderType = "ONE_MINUTE_BEFORE"
+            reminderType = "ONE_MINUTE_BEFORE",
+            calendarName = "Test Calendar"
         )
 
         // Add to queue
@@ -564,12 +566,14 @@ class SettingsActivity : AppCompatActivity() {
     private fun testMultipleEvents() {
         val baseTime = System.currentTimeMillis()
 
-        // Create 3 test events
+        // Create 3 test events with different calendar names
         val events = listOf(
             Triple("Team Meeting", baseTime + 5000, "FIVE_MINUTES_BEFORE"),
             Triple("Doctor Appointment", baseTime + 10000, "TEN_MINUTES_BEFORE"),
             Triple("Lunch with Client", baseTime + 15000, "FIFTEEN_MINUTES_BEFORE")
         )
+
+        val calendarNames = listOf("Work", "Personal", "Family")
 
         // Add all events to the queue
         events.forEachIndexed { index, (title, startTime, type) ->
@@ -577,7 +581,8 @@ class SettingsActivity : AppCompatActivity() {
                 eventId = baseTime + index + 100, // Unique IDs
                 eventTitle = title,
                 eventStartTime = startTime,
-                reminderType = type
+                reminderType = type,
+                calendarName = calendarNames[index]
             )
             me.tewodros.vibecalendaralarm.PendingAlarmsManager.addAlarm(pendingAlarm)
         }

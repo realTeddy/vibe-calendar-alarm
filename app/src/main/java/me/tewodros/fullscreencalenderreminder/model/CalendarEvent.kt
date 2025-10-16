@@ -8,4 +8,5 @@ data class CalendarEvent(
     val title: String,
     val startTime: Long,
     val reminderMinutes: List<Int>, // List of all reminder times in minutes before event
+    val calendarName: String = "Unknown Calendar", // Name of the calendar this event belongs to
 )

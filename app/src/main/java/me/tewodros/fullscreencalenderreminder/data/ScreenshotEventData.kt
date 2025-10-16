@@ -121,7 +121,7 @@ object ScreenshotEventData {
     }
 
     /**
-     * Creates a fake CalendarEvent with all required fields
+     * Helper function to create a fake event with demo data
      */
     private fun createFakeEvent(
         id: Long,
@@ -132,11 +132,19 @@ object ScreenshotEventData {
         endTime: Long,
         reminderMinutes: Int,
     ): CalendarEvent {
+        // Assign different calendar names to different events for variety
+        val calendarName = when (id % 3) {
+            0L -> "Work"
+            1L -> "Personal"
+            else -> "Family"
+        }
+
         return CalendarEvent(
             id = id,
             title = "$title - $location",
             startTime = startTime,
             reminderMinutes = listOf(reminderMinutes),
+            calendarName = calendarName
         )
     }
 

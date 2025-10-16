@@ -361,14 +361,14 @@ class ReminderActivity : AppCompatActivity() {
             isVerticalScrollBarEnabled = false
         }
 
-        // Container for event cards
+        // Container for event cards - match Settings padding
         eventsContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            setPadding(24, 0, 24, 32)  // More padding for Material You
+            setPadding(16, 16, 16, 16)  // Match Settings padding (16px all sides)
         }
 
         scrollView.addView(eventsContainer)
@@ -392,22 +392,28 @@ class ReminderActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
 
+                // Deduplicate events based on event title and start time
+                val uniqueEvents = events.distinctBy { "${it.eventTitle}|${it.eventStartTime}" }
+                if (uniqueEvents.size < events.size) {
+                    Log.d(TAG, "Removed ${events.size - uniqueEvents.size} duplicate events")
+                }
+
                 // Update header
-                val count = events.size
+                val count = uniqueEvents.size
                 headerText?.text = if (count == 1) "1 REMINDER" else "$count REMINDERS"
                 Log.d(TAG, "Updated header: ${headerText?.text}")
 
                 // Clear existing event cards
                 eventsContainer?.removeAllViews()
 
-                // Create card for each event
-                events.forEach { alarm ->
+                // Create card for each unique event
+                uniqueEvents.forEach { alarm ->
                     Log.d(TAG, "Creating card for: ${alarm.eventTitle}")
                     val eventCard = createEventCard(alarm)
                     eventsContainer?.addView(eventCard)
                 }
 
-                Log.d(TAG, "Successfully updated events list")
+                Log.d(TAG, "Successfully updated events list with ${uniqueEvents.size} unique events")
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating events list: ${e.message}", e)
                 e.printStackTrace()
@@ -423,7 +429,6 @@ class ReminderActivity : AppCompatActivity() {
         val theme = theme
         val typedArray = theme.obtainStyledAttributes(
             intArrayOf(
-                com.google.android.material.R.attr.colorSurfaceVariant,
                 com.google.android.material.R.attr.colorOnSurface,
                 com.google.android.material.R.attr.colorOnSurfaceVariant,
                 com.google.android.material.R.attr.colorPrimary,
@@ -433,32 +438,31 @@ class ReminderActivity : AppCompatActivity() {
             )
         )
 
-        val cardColor = typedArray.getColor(0, getColor(R.color.md_theme_light_surfaceVariant))
-        val onSurfaceColor = typedArray.getColor(1, getColor(R.color.md_theme_light_onSurface))
-        val onSurfaceVariantColor = typedArray.getColor(2, getColor(R.color.md_theme_light_onSurfaceVariant))
-        val primaryColor = typedArray.getColor(3, getColor(R.color.md_theme_light_primary))
-        val onPrimaryColor = typedArray.getColor(4, getColor(R.color.md_theme_light_onPrimary))
-        val secondaryContainerColor = typedArray.getColor(5, getColor(R.color.md_theme_light_secondaryContainer))
-        val onSecondaryContainerColor = typedArray.getColor(6, getColor(R.color.md_theme_light_onSecondaryContainer))
+        val onSurfaceColor = typedArray.getColor(0, getColor(R.color.md_theme_light_onSurface))
+        val onSurfaceVariantColor = typedArray.getColor(1, getColor(R.color.md_theme_light_onSurfaceVariant))
+        val primaryColor = typedArray.getColor(2, getColor(R.color.md_theme_light_primary))
+        val onPrimaryColor = typedArray.getColor(3, getColor(R.color.md_theme_light_onPrimary))
+        val secondaryContainerColor = typedArray.getColor(4, getColor(R.color.md_theme_light_secondaryContainer))
+        val onSecondaryContainerColor = typedArray.getColor(5, getColor(R.color.md_theme_light_onSecondaryContainer))
         typedArray.recycle()
 
-        // Card container with Material You styling
+        // Card container matching Settings style
         val cardView = com.google.android.material.card.MaterialCardView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(0, 0, 0, 16)  // More spacing between cards
+                setMargins(0, 0, 0, 16)
             }
-            radius = dpToPx(28).toFloat()  // Larger radius for Material You
-            cardElevation = 0f
-            setCardBackgroundColor(cardColor)
+            radius = 16f  // Match Settings style
+            cardElevation = 2f  // Subtle shadow like Settings
+            // Don't set background color - use default card color like Settings
         }
 
-        // Card content
+        // Card content - match Settings padding
         val cardContent = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(28, 28, 28, 24)  // More generous padding
+            setPadding(24, 20, 24, 24)  // Match Settings: 24, 20, 24, 24
         }
 
         // Event title - Material You headline style
@@ -513,8 +517,17 @@ class ReminderActivity : AppCompatActivity() {
             setPadding(0, 6, 0, 0)
         }
 
+        // Calendar name
+        val calendarNameText = TextView(this).apply {
+            text = "📅 ${alarm.calendarName}"
+            textSize = 13f
+            setTextColor(onSurfaceVariantColor)
+            setPadding(0, 4, 0, 0)
+        }
+
         timeInfoContainer.addView(timeText)
         timeInfoContainer.addView(countdownText)
+        timeInfoContainer.addView(calendarNameText)
 
         // Buttons container
         val buttonContainer = LinearLayout(this).apply {
@@ -525,44 +538,38 @@ class ReminderActivity : AppCompatActivity() {
             )
         }
 
-        // Snooze button - Material You tonal style (secondary action)
+        // Snooze button - tonal style for secondary action
         val snoozeButton = com.google.android.material.button.MaterialButton(this).apply {
             text = "Snooze"
-            textSize = 16f  // Slightly larger
             layoutParams = LinearLayout.LayoutParams(
                 0,
-                dpToPx(52),  // Taller buttons
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             ).apply {
-                setMargins(0, 0, 8, 0)  // More spacing
+                setMargins(0, 0, 4, 0)
             }
-            cornerRadius = dpToPx(100)  // Full rounded - Material You style
+            // cornerRadius inherited from global style
             backgroundTintList = android.content.res.ColorStateList.valueOf(secondaryContainerColor)
             setTextColor(onSecondaryContainerColor)
-            elevation = 0f
-            stateListAnimator = null  // Remove elevation animation
 
             setOnClickListener {
                 showSnoozeDialog(alarm)
             }
         }
 
-        // Dismiss button - Material You filled tonal style (primary action)
+        // Dismiss button - filled style for primary action
         val dismissButton = com.google.android.material.button.MaterialButton(this).apply {
             text = "Dismiss"
-            textSize = 16f  // Slightly larger
             layoutParams = LinearLayout.LayoutParams(
                 0,
-                dpToPx(52),  // Taller buttons
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             ).apply {
-                setMargins(8, 0, 0, 0)  // More spacing
+                setMargins(4, 0, 0, 0)
             }
-            cornerRadius = dpToPx(100)  // Full rounded - Material You style
+            // cornerRadius inherited from global style
             backgroundTintList = android.content.res.ColorStateList.valueOf(primaryColor)
             setTextColor(onPrimaryColor)
-            elevation = 0f
-            stateListAnimator = null  // Remove elevation animation
 
             setOnClickListener {
                 dismissEvent(alarm)

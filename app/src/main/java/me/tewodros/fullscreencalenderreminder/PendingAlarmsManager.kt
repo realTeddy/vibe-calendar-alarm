@@ -16,6 +16,7 @@ object PendingAlarmsManager {
         val eventTitle: String,
         val eventStartTime: Long,
         val reminderType: String,
+        val calendarName: String = "Unknown Calendar", // Name of the calendar this event belongs to
         val timestamp: Long = System.currentTimeMillis() // When alarm was triggered
     )
 

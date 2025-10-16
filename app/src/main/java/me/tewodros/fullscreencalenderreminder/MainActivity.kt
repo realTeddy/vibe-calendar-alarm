@@ -49,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val REQUEST_CALENDAR_PERMISSION = 1001
         private const val REQUEST_NOTIFICATION_PERMISSION = 1002
+        private const val MAX_EVENTS_TO_DISPLAY = 20  // Limit events shown in UI
     }
 
     // Add flag to prevent recursive permission requests
@@ -97,9 +98,22 @@ class MainActivity : AppCompatActivity() {
                 try {
                     binding.statusText.text = "Loading events..."
                     val events = calendarManager.getUpcomingEventsWithReminders()
-                    eventAdapter.submitList(events)
-                    binding.statusText.text = "Found ${events.size} upcoming events with reminders"
-                    updateEventsCount(events.size)
+
+                    // Limit events to display
+                    val totalEvents = events.size
+                    val eventsToDisplay = events.take(MAX_EVENTS_TO_DISPLAY)
+
+                    eventAdapter.submitList(eventsToDisplay)
+                    binding.statusText.text = "Found $totalEvents upcoming events with reminders"
+                    updateEventsCount(totalEvents)
+
+                    // Show "view more" message if there are more events than displayed
+                    if (totalEvents > MAX_EVENTS_TO_DISPLAY) {
+                        binding.viewMoreText.visibility = android.view.View.VISIBLE
+                        binding.viewMoreText.text = "Showing $MAX_EVENTS_TO_DISPLAY of $totalEvents events • View all in your calendar app"
+                    } else {
+                        binding.viewMoreText.visibility = android.view.View.GONE
+                    }
 
                     // Only auto-schedule if it's been more than 5 minutes since last scheduling
                     // to prevent constant rescheduling on every app open
@@ -221,7 +235,7 @@ class MainActivity : AppCompatActivity() {
         // Start background monitoring using the working CalendarManager approach
         ReminderWorkManager.startPeriodicMonitoring(this)
 
-        binding.statusText.text = "✅ App ready - Calendar monitoring active"
+        binding.statusText.text = "App ready - Calendar monitoring active"
     }
 
     /**
@@ -634,8 +648,19 @@ class MainActivity : AppCompatActivity() {
         Log.d("MainActivity", "📸 Displaying fake events for screenshots")
 
         val fakeEvents = ScreenshotEventData.getFakeEvents()
-        eventAdapter.submitList(fakeEvents)
-        binding.statusText.text = "📸 Screenshot Mode: Showing ${fakeEvents.size} demo events"
-        updateEventsCount(fakeEvents.size)
+        val totalEvents = fakeEvents.size
+        val eventsToDisplay = fakeEvents.take(MAX_EVENTS_TO_DISPLAY)
+
+        eventAdapter.submitList(eventsToDisplay)
+        binding.statusText.text = "📸 Screenshot Mode: Showing $totalEvents demo events"
+        updateEventsCount(totalEvents)
+
+        // Show "view more" message if there are more events than displayed
+        if (totalEvents > MAX_EVENTS_TO_DISPLAY) {
+            binding.viewMoreText.visibility = android.view.View.VISIBLE
+            binding.viewMoreText.text = "Showing $MAX_EVENTS_TO_DISPLAY of $totalEvents events • View all in your calendar app"
+        } else {
+            binding.viewMoreText.visibility = android.view.View.GONE
+        }
     }
 }
