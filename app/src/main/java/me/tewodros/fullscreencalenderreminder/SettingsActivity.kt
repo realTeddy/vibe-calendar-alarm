@@ -26,9 +26,11 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var finalReminderValueText: TextView
     private lateinit var debugModeSwitch: SwitchMaterial
     private lateinit var screenshotModeSwitch: SwitchMaterial
+    private lateinit var calendarManager: CalendarManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        calendarManager = CalendarManager(this)
         createMaterialYouLayout()
         loadSettings()
     }
@@ -435,9 +437,22 @@ class SettingsActivity : AppCompatActivity() {
             setOnClickListener { testMultipleEvents() }
         }
 
+        val testScheduledAlarmButton = MaterialButton(this).apply {
+            text = "Test Scheduled Alarm (10s)"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                setMargins(0, 0, 0, 8)
+            }
+            // cornerRadius inherited from global style
+            setOnClickListener { testScheduledAlarm() }
+        }
+
         testButtonsContainer.addView(testImmediateButton)
         testButtonsContainer.addView(test1MinButton)
         testButtonsContainer.addView(testMultipleButton)
+        testButtonsContainer.addView(testScheduledAlarmButton)
 
         // Update test buttons visibility when debug mode changes
         debugModeSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -596,6 +611,34 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         Toast.makeText(this, "3 test events added to queue", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * Test scheduled alarm using the actual AlarmManager pipeline
+     * This creates a CalendarEvent and schedules it through CalendarManager,
+     * testing the full flow: AlarmManager -> AlarmReceiver -> ReminderActivity
+     */
+    private fun testScheduledAlarm() {
+        val now = System.currentTimeMillis()
+        val alarmTime = now + 10000 // 10 seconds from now (must be > 5s to pass CalendarManager check)
+
+        // Create a fake calendar event
+        val testEvent = me.tewodros.vibecalendaralarm.model.CalendarEvent(
+            id = now, // Use timestamp as unique ID
+            title = "🔔 Test Scheduled Alarm",
+            startTime = alarmTime,
+            reminderMinutes = listOf(0), // Alarm at event time (0 minutes before)
+            calendarName = "Test Calendar"
+        )
+
+        // Schedule the alarm using CalendarManager (tests the real alarm pipeline)
+        calendarManager.scheduleReminder(testEvent)
+
+        Toast.makeText(
+            this,
+            "⏰ Alarm scheduled for 10 seconds from now",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     companion object {

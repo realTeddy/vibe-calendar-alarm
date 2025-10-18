@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Quick Actions submenu -->
+    <item
+        android:id="@+id/action_refresh"
+        android:icon="@drawable/ic_refresh_24"
+        android:title="Refresh &amp; Auto-schedule"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_calendar"
+        android:icon="@drawable/ic_calendar_month_24"
+        android:title="Open Calendar"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_permissions"
+        android:icon="@drawable/ic_security_24"
+        android:title="Permissions"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_settings"
+        android:icon="@drawable/ic_settings_24"
+        android:title="Settings"
+        app:showAsAction="never" />
+
+</menu>

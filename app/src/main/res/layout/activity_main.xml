@@ -17,7 +17,8 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:title="Calendar Reminders"
-            app:titleTextAppearance="@style/TextAppearance.Material3.HeadlineSmall" />
+            app:titleTextAppearance="@style/TextAppearance.Material3.HeadlineSmall"
+            app:menu="@menu/main_menu" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -84,133 +85,39 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Quick Actions Card -->
-            <com.google.android.material.card.MaterialCardView
+            <!-- RecyclerView for Events (no wrapping card) -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/eventsRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp">
+                android:nestedScrollingEnabled="false"
+                android:overScrollMode="never"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="20dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Quick Actions"
-                        android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall"
-                        android:textColor="?attr/colorOnSurface"
-                        android:layout_marginBottom="16dp" />
-
-                    <!-- Main Action Button -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/refreshButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
-                        android:text="Refresh &amp; Auto-schedule"
-                        app:icon="@drawable/ic_refresh_24" />
-
-                    <!-- Quick Access Chips -->
-                    <com.google.android.material.chip.ChipGroup
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        app:chipSpacing="8dp"
-                        app:chipSpacingHorizontal="8dp">
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/calendarChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Calendar"
-                            app:chipIcon="@drawable/ic_calendar_month_24"
-                            style="@style/Widget.Material3.Chip.Assist" />
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/settingsChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Settings"
-                            app:chipIcon="@drawable/ic_settings_24"
-                            style="@style/Widget.Material3.Chip.Assist" />
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/permissionsChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Permissions"
-                            app:chipIcon="@drawable/ic_security_24"
-                            style="@style/Widget.Material3.Chip.Assist" />
-
-                    </com.google.android.material.chip.ChipGroup>
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Events Card -->
-            <com.google.android.material.card.MaterialCardView
+            <!-- View More Message -->
+            <TextView
+                android:id="@+id/viewMoreText"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <!-- Events Header -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:padding="20dp"
-                        android:paddingBottom="12dp"
-                        android:gravity="center_vertical">
-
-                        <TextView
-                            android:id="@+id/eventsSectionTitle"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Upcoming Events"
-                            android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall"
-                            android:textColor="?attr/colorOnSurface" />
-
-                    </LinearLayout>
-
-                    <!-- RecyclerView for Events -->
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/eventsRecyclerView"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="8dp"
-                        android:nestedScrollingEnabled="false"
-                        android:overScrollMode="never"
-                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
-
-                    <!-- View More Message -->
-                    <TextView
-                        android:id="@+id/viewMoreText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="View all events in your calendar app"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textAlignment="center"
-                        android:padding="16dp"
-                        android:paddingBottom="20dp"
-                        android:visibility="gone" />
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
+                android:layout_height="wrap_content"
+                android:text="View all events in your calendar app"
+                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textAlignment="center"
+                android:padding="16dp"
+                android:visibility="gone" />
 
         </LinearLayout>
 
     </androidx.core.widget.NestedScrollView>
 
-
+    <!-- Floating Action Button for Quick Refresh -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_refresh"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:contentDescription="Refresh and auto-schedule"
+        app:srcCompat="@drawable/ic_refresh_24" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
