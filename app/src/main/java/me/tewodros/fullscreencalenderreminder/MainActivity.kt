@@ -83,8 +83,12 @@ class MainActivity : AppCompatActivity() {
         checkPermissionsAndInitialize()
     }
 
-    private fun refreshEventsDisplay() {
-        Log.d("MainActivity", "Refreshing events display")
+    /**
+     * Load and display events only (no scheduling)
+     * This is called on app launch to show the list without triggering alarm scheduling
+     */
+    private fun loadEventsOnly() {
+        Log.d("MainActivity", "Loading events display only (no scheduling)")
 
         // Check if screenshot mode is enabled
         if (SettingsActivity.isScreenshotModeEnabled(this)) {
@@ -104,7 +108,52 @@ class MainActivity : AppCompatActivity() {
                     val eventsToDisplay = events.take(MAX_EVENTS_TO_DISPLAY)
 
                     eventAdapter.submitList(eventsToDisplay)
-                    binding.statusText.text = "Found $totalEvents upcoming events with reminders"
+                    binding.statusText.text = "Background monitoring active"
+                    updateEventsCount(totalEvents)
+
+                    // Show "view more" message if there are more events than displayed
+                    if (totalEvents > MAX_EVENTS_TO_DISPLAY) {
+                        binding.viewMoreText.visibility = android.view.View.VISIBLE
+                        binding.viewMoreText.text = "Showing $MAX_EVENTS_TO_DISPLAY of $totalEvents events • View all in your calendar app"
+                    } else {
+                        binding.viewMoreText.visibility = android.view.View.GONE
+                    }
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Error loading events: ${e.message}")
+                    binding.statusText.text = "Error loading events: ${e.message}"
+                }
+            }
+        } else {
+            Log.w("MainActivity", "⚠️ Cannot load events - missing calendar permission")
+        }
+    }
+
+    /**
+     * Refresh events and auto-schedule alarms
+     * This is called when user taps the "Refresh & Auto-schedule" button
+     */
+    private fun refreshEventsDisplay() {
+        Log.d("MainActivity", "Refreshing events display and scheduling alarms")
+
+        // Check if screenshot mode is enabled
+        if (SettingsActivity.isScreenshotModeEnabled(this)) {
+            Log.d("MainActivity", "📸 Screenshot mode enabled - showing fake events")
+            displayFakeEvents()
+            Toast.makeText(this, "Screenshot mode - no actual scheduling", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (hasCalendarPermission()) {
+            lifecycleScope.launch {
+                try {
+                    binding.statusText.text = "Loading events..."
+                    val events = calendarManager.getUpcomingEventsWithReminders()
+
+                    // Limit events to display
+                    val totalEvents = events.size
+                    val eventsToDisplay = events.take(MAX_EVENTS_TO_DISPLAY)
+
+                    eventAdapter.submitList(eventsToDisplay)
                     updateEventsCount(totalEvents)
 
                     // Show "view more" message if there are more events than displayed
@@ -115,38 +164,33 @@ class MainActivity : AppCompatActivity() {
                         binding.viewMoreText.visibility = android.view.View.GONE
                     }
 
-                    // Only auto-schedule if it's been more than 5 minutes since last scheduling
-                    // to prevent constant rescheduling on every app open
-                    val lastScheduleTime = getSharedPreferences("alarm_prefs", MODE_PRIVATE)
-                        .getLong("last_auto_schedule", 0)
-                    val now = System.currentTimeMillis()
-                    val fiveMinutes = 5 * 60 * 1000L
+                    // Schedule alarms for all events (user explicitly requested refresh)
+                    if (events.isNotEmpty() && hasAlarmPermission() && hasNotificationPermission()) {
+                        Log.d("MainActivity", "Scheduling alarms for ${events.size} events")
+                        binding.statusText.text = "Scheduling alarms..."
 
-                    if (events.isNotEmpty() && hasAlarmPermission() && hasNotificationPermission() && (now - lastScheduleTime) > fiveMinutes) {
-                        Log.d(
-                            "MainActivity",
-                            "Auto-scheduling alarms for ${events.size} events (last run: ${(now - lastScheduleTime) / 1000}s ago)",
-                        )
                         try {
                             calendarManager.scheduleAllReminders()
-                            // Save the time we did auto-scheduling
+                            binding.statusText.text = "Scheduled alarms for $totalEvents events"
+                            Toast.makeText(this@MainActivity, "Alarms scheduled for $totalEvents events", Toast.LENGTH_SHORT).show()
+
+                            // Save the time we did scheduling
                             getSharedPreferences("alarm_prefs", MODE_PRIVATE)
                                 .edit()
-                                .putLong("last_auto_schedule", now)
+                                .putLong("last_auto_schedule", System.currentTimeMillis())
                                 .apply()
                         } catch (e: Exception) {
-                            Log.e("MainActivity", "Auto-scheduling failed: ${e.message}")
+                            Log.e("MainActivity", "Scheduling failed: ${e.message}")
+                            binding.statusText.text = "Error scheduling alarms"
+                            Toast.makeText(this@MainActivity, "Error scheduling alarms: ${e.message}", Toast.LENGTH_LONG).show()
                         }
-                    } else if (events.isNotEmpty() && (now - lastScheduleTime) <= fiveMinutes) {
-                        Log.d(
-                            "MainActivity",
-                            "Skipping auto-schedule (too recent: ${(now - lastScheduleTime) / 1000}s ago)",
-                        )
-                    } else if (events.isNotEmpty()) {
-                        Log.w(
-                            "MainActivity",
-                            "Events found but missing permissions for auto-scheduling",
-                        )
+                    } else if (events.isEmpty()) {
+                        binding.statusText.text = "No events found with reminders"
+                        Toast.makeText(this@MainActivity, "No events found", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Log.w("MainActivity", "Events found but missing permissions for scheduling")
+                        binding.statusText.text = "Missing permissions for alarm scheduling"
+                        Toast.makeText(this@MainActivity, "Missing alarm/notification permissions", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
                     Log.e("MainActivity", "Error loading events: ${e.message}")
@@ -229,13 +273,14 @@ class MainActivity : AppCompatActivity() {
     private fun initializeApp() {
         Log.d("MainActivity", "Initializing app with all permissions granted")
 
-        // Load and display events, which will trigger automatic scheduling
-        refreshEventsDisplay()
-
         // Start background monitoring using the working CalendarManager approach
         ReminderWorkManager.startPeriodicMonitoring(this)
 
-        binding.statusText.text = "App ready - Calendar monitoring active"
+        // Just load and display events without auto-scheduling
+        // User must tap "Refresh & Auto-schedule" button to manually trigger scheduling
+        loadEventsOnly()
+
+        binding.statusText.text = "App ready - Background monitoring active"
     }
 
     /**
@@ -563,8 +608,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             REQUEST_NOTIFICATION_PERMISSION -> {
+                isRequestingPermissions = false // Reset flag
+
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.d("MainActivity", "✅ Notification permission granted")
+                    // Continue to check next permission
+                    checkPermissionsAndInitialize()
                 } else {
                     Log.e("MainActivity", "❌ Notification permission denied")
                     Toast.makeText(
@@ -572,9 +621,8 @@ class MainActivity : AppCompatActivity() {
                         "Notification permission is required for calendar reminders to work properly. You can enable it later in Settings.",
                         Toast.LENGTH_LONG,
                     ).show()
+                    // Don't continue - user denied, let them use permissions chip to retry
                 }
-                // Continue to check next permission (even if denied, as notifications are not critical)
-                checkPermissionsAndInitialize()
             }
         }
     }
