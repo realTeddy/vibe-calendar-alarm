@@ -8,6 +8,56 @@ plugins {
     id("io.gitlab.arturbosch.detekt") version "1.23.3"
 }
 
+fun getVersionCode(): Int {
+    // Use environment variable if set (for CI/CD), otherwise count git tags
+    val envVersionCode = System.getenv("VERSION_CODE")
+    println("🔍 VERSION_CODE env var: '${envVersionCode ?: "not set"}'")
+
+    if (!envVersionCode.isNullOrEmpty()) {
+        return try {
+            val code = envVersionCode.toInt()
+            println("✅ Using VERSION_CODE from environment: $code")
+            code
+        } catch (e: NumberFormatException) {
+            println("⚠️ Invalid VERSION_CODE environment variable: '$envVersionCode'")
+            1
+        }
+    }
+
+    return try {
+        val process = Runtime.getRuntime().exec("git tag --list v*")
+        val tagCount = process.inputStream.bufferedReader().readLines().size
+        val code = maxOf(1, tagCount)
+        println("📋 Using VERSION_CODE from git tags: $code")
+        code
+    } catch (e: Exception) {
+        println("⚠️ Could not get git tag count, using version code 1")
+        1
+    }
+}
+
+fun getVersionName(): String {
+    // Use environment variable if set (for CI/CD), otherwise try to get from git tag
+    val envVersionName = System.getenv("VERSION_NAME")
+    println("🔍 VERSION_NAME env var: '${envVersionName ?: "not set"}'")
+
+    if (!envVersionName.isNullOrEmpty()) {
+        println("✅ Using VERSION_NAME from environment: $envVersionName")
+        return envVersionName
+    }
+
+    return try {
+        val process = Runtime.getRuntime().exec("git describe --tags --abbrev=0")
+        val tag = process.inputStream.bufferedReader().readText().trim()
+        val name = tag.removePrefix("v").ifEmpty { "1.0.0" }
+        println("📋 Using VERSION_NAME from git tag: $name")
+        name
+    } catch (e: Exception) {
+        println("📋 Using default VERSION_NAME: 1.0.0")
+        "1.0.0"
+    }
+}
+
 android {
     namespace = "me.tewodros.vibecalendaralarm"
     compileSdk = 36
@@ -16,8 +66,8 @@ android {
         applicationId = "me.tewodros.vibecalendaralarm"
         minSdk = 21
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = getVersionCode()
+        versionName = getVersionName()
 
         // App metadata for deployment
         resValue("string", "app_version", versionName!!)
