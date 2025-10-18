@@ -8,6 +8,45 @@ plugins {
     id("io.gitlab.arturbosch.detekt") version "1.23.3"
 }
 
+fun getVersionCode(): Int {
+    // Use environment variable if set (for CI/CD), otherwise count git tags
+    val envVersionCode = System.getenv("VERSION_CODE")
+    if (!envVersionCode.isNullOrEmpty()) {
+        return try {
+            envVersionCode.toInt()
+        } catch (e: NumberFormatException) {
+            println("Warning: Invalid VERSION_CODE environment variable: '$envVersionCode'")
+            1
+        }
+    }
+
+    return try {
+        val process = Runtime.getRuntime().exec("git tag --list v*")
+        val tagCount = process.inputStream.bufferedReader().readLines().size
+        // Start from version code 1 if no tags, otherwise use tag count
+        maxOf(1, tagCount)
+    } catch (e: Exception) {
+        println("Warning: Could not get git tag count, using version code 1")
+        1
+    }
+}
+
+fun getVersionName(): String {
+    // Use environment variable if set (for CI/CD), otherwise try to get from git tag
+    val envVersionName = System.getenv("VERSION_NAME")
+    if (!envVersionName.isNullOrEmpty()) {
+        return envVersionName
+    }
+
+    return try {
+        val process = Runtime.getRuntime().exec("git describe --tags --abbrev=0")
+        val tag = process.inputStream.bufferedReader().readText().trim()
+        tag.removePrefix("v").ifEmpty { "1.0.0" }
+    } catch (e: Exception) {
+        "1.0.0"
+    }
+}
+
 android {
     namespace = "me.tewodros.vibecalendaralarm"
     compileSdk = 36
@@ -16,8 +55,8 @@ android {
         applicationId = "me.tewodros.vibecalendaralarm"
         minSdk = 21
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = getVersionCode()
+        versionName = getVersionName()
 
         // App metadata for deployment
         resValue("string", "app_version", versionName!!)

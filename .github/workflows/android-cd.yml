@@ -44,28 +44,20 @@ jobs:
       run: |
         echo $KEYSTORE_BASE64 | base64 -d > app/keystore.jks
 
-    - name: Run tests
-      run: ./gradlew testDebugUnitTest
-
-    - name: Build release APK
-      run: ./gradlew assembleRelease
-      env:
-        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-    - name: Build release AAB
-      run: ./gradlew bundleRelease
-      env:
-        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
     - name: Extract release notes
       id: release_notes
       run: |
         VERSION=${GITHUB_REF#refs/tags/}
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+        # Calculate version code from tag (e.g., v1.0.0 -> 1, v1.1.0 -> 2, etc.)
+        # Count all tags to get incrementing version code
+        TAG_COUNT=$(git tag --list 'v*' | wc -l)
+        echo "VERSION_CODE=$TAG_COUNT" >> $GITHUB_OUTPUT
+
+        # Extract version name from tag (remove 'v' prefix)
+        VERSION_NAME=${VERSION#v}
+        echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
 
         # Extract changelog for this version
         if [ -f CHANGELOG.md ]; then
@@ -77,6 +69,27 @@ jobs:
         else
           echo "RELEASE_NOTES=Release $VERSION" >> $GITHUB_OUTPUT
         fi
+
+    - name: Run tests
+      run: ./gradlew testDebugUnitTest
+
+    - name: Build release APK
+      run: ./gradlew assembleRelease
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        VERSION_CODE: ${{ steps.release_notes.outputs.VERSION_CODE }}
+        VERSION_NAME: ${{ steps.release_notes.outputs.VERSION_NAME }}
+
+    - name: Build release AAB
+      run: ./gradlew bundleRelease
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        VERSION_CODE: ${{ steps.release_notes.outputs.VERSION_CODE }}
+        VERSION_NAME: ${{ steps.release_notes.outputs.VERSION_NAME }}
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
