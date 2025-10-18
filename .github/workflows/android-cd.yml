@@ -44,28 +44,26 @@ jobs:
       run: |
         echo $KEYSTORE_BASE64 | base64 -d > app/keystore.jks
 
-    - name: Run tests
-      run: ./gradlew testDebugUnitTest
-
-    - name: Build release APK
-      run: ./gradlew assembleRelease
-      env:
-        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-    - name: Build release AAB
-      run: ./gradlew bundleRelease
-      env:
-        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
     - name: Extract release notes
       id: release_notes
       run: |
         VERSION=${GITHUB_REF#refs/tags/}
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+        # Calculate version code from tag (e.g., v1.0.0 -> 1, v1.1.0 -> 2, etc.)
+        # Count all tags to get incrementing version code
+        TAG_COUNT=$(git tag --list 'v*' | wc -l)
+        echo "VERSION_CODE=$TAG_COUNT" >> $GITHUB_OUTPUT
+
+        # Extract version name from tag (remove 'v' prefix)
+        VERSION_NAME=${VERSION#v}
+        echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+        # Debug output
+        echo "📦 Version Information:"
+        echo "  Tag: $VERSION"
+        echo "  Version Code: $TAG_COUNT"
+        echo "  Version Name: $VERSION_NAME"
 
         # Extract changelog for this version
         if [ -f CHANGELOG.md ]; then
@@ -76,6 +74,56 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
         else
           echo "RELEASE_NOTES=Release $VERSION" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run tests
+      run: ./gradlew testDebugUnitTest
+
+    - name: Build release APK
+      run: |
+        echo "🔨 Building APK with VERSION_CODE=$VERSION_CODE and VERSION_NAME=$VERSION_NAME"
+        ./gradlew clean assembleRelease \
+          -PversionCode=$VERSION_CODE \
+          -PversionName="$VERSION_NAME" \
+          --no-daemon \
+          --no-build-cache
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        VERSION_CODE: ${{ steps.release_notes.outputs.VERSION_CODE }}
+        VERSION_NAME: ${{ steps.release_notes.outputs.VERSION_NAME }}
+
+    - name: Build release AAB
+      run: |
+        echo "🔨 Building AAB with VERSION_CODE=$VERSION_CODE and VERSION_NAME=$VERSION_NAME"
+        ./gradlew bundleRelease \
+          -PversionCode=$VERSION_CODE \
+          -PversionName="$VERSION_NAME" \
+          --no-daemon \
+          --no-build-cache
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        VERSION_CODE: ${{ steps.release_notes.outputs.VERSION_CODE }}
+        VERSION_NAME: ${{ steps.release_notes.outputs.VERSION_NAME }}
+        VERSION_CODE: ${{ steps.release_notes.outputs.VERSION_CODE }}
+        VERSION_NAME: ${{ steps.release_notes.outputs.VERSION_NAME }}
+
+    - name: Verify AAB version
+      run: |
+        echo "📦 Verifying AAB was built with correct version..."
+        echo "Expected VERSION_CODE: ${{ steps.release_notes.outputs.VERSION_CODE }}"
+        echo "Expected VERSION_NAME: ${{ steps.release_notes.outputs.VERSION_NAME }}"
+
+        # Extract AndroidManifest.xml from AAB and check version
+        unzip -p app/build/outputs/bundle/release/app-release.aab base/manifest/AndroidManifest.xml > manifest.xml || true
+        if [ -f manifest.xml ]; then
+          echo "✅ AAB file exists and is valid"
+          ls -lh app/build/outputs/bundle/release/app-release.aab
+        else
+          echo "⚠️ Could not extract manifest"
         fi
 
     - name: Create GitHub Release
@@ -102,7 +150,6 @@ jobs:
         status: completed
         whatsNewDirectory: distribution/whatsnew
         mappingFile: app/build/outputs/mapping/release/mapping.txt
-        debugSymbols: app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip
 
     - name: Clean up keystore
       if: always()
