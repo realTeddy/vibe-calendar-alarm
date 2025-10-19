@@ -388,7 +388,7 @@ class ReminderActivity : AppCompatActivity() {
                 // If no events, close the activity
                 if (events.isEmpty()) {
                     Log.d(TAG, "No events, closing activity")
-                    finish()
+                    closeActivity()
                     return@runOnUiThread
                 }
 
@@ -692,6 +692,31 @@ class ReminderActivity : AppCompatActivity() {
      */
     private fun dpToPx(dp: Int): Int {
         return (dp * resources.displayMetrics.density).toInt()
+    }
+
+    /**
+     * Close the activity without bringing the app to the foreground
+     * This is used when the reminder was shown over other apps and dismissed
+     */
+    private fun closeActivity() {
+        Log.d(TAG, "Closing activity gracefully")
+
+        // Check if there are other activities in the task
+        // If this is NOT the root activity, it means the app was already open
+        if (isTaskRoot) {
+            // This is the only activity in the task (or root activity)
+            // The app was launched just for this reminder
+            // Move the task to back to prevent bringing MainActivity forward
+            Log.d(TAG, "Activity is task root - moving task to back")
+            moveTaskToBack(true)
+        } else {
+            // There are other activities in the task (app was already open)
+            // Just finish this activity to return to the previous activity
+            Log.d(TAG, "Activity is NOT task root - app was already open, just finishing")
+        }
+
+        // Finish the activity
+        finish()
     }
 
     override fun onDestroy() {
