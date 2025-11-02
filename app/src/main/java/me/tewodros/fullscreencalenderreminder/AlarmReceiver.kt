@@ -30,6 +30,20 @@ class AlarmReceiver : BroadcastReceiver() {
         Log.d("AlarmReceiver", "Alarm type: $reminderType, Action: $action")
         Log.d("AlarmReceiver", "Current time: ${System.currentTimeMillis()}")
 
+        // Verify the event still exists in the calendar before showing reminder
+        val calendarManager = CalendarManager(context)
+        if (!calendarManager.verifyEventExists(eventId, eventStartTime)) {
+            Log.w(
+                "AlarmReceiver",
+                "⚠️ Event $eventId no longer exists or has been modified - skipping reminder"
+            )
+            // Cancel any remaining alarms for this event
+            calendarManager.cancelReminder(eventId)
+            return
+        }
+
+        Log.d("AlarmReceiver", "✓ Event verified - continuing with reminder")
+
         // Create pending alarm object
         val pendingAlarm = PendingAlarmsManager.PendingAlarm(
             eventId = eventId,

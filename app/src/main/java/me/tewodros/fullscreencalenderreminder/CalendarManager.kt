@@ -1092,6 +1092,86 @@ class CalendarManager(private val context: Context) {
     }
 
     /**
+     * Verify if an event still exists in the calendar at the specified time
+     * This is used to validate alarms before showing them
+     *
+     * @param eventId The event ID to check
+     * @param expectedStartTime The expected start time of the event
+     * @return true if the event exists and matches the time, false otherwise
+     */
+    fun verifyEventExists(eventId: Long, expectedStartTime: Long): Boolean {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
+            Log.w("CalendarManager", "Calendar permission not granted, cannot verify event")
+            return false
+        }
+
+        try {
+            // Query the specific event by ID
+            val eventUri = CalendarContract.Events.CONTENT_URI
+            val cursor: Cursor? = context.contentResolver.query(
+                eventUri,
+                arrayOf(
+                    CalendarContract.Events._ID,
+                    CalendarContract.Events.TITLE,
+                    CalendarContract.Events.DTSTART,
+                    CalendarContract.Events.DELETED,
+                    CalendarContract.Events.STATUS
+                ),
+                "${CalendarContract.Events._ID} = ?",
+                arrayOf(eventId.toString()),
+                null
+            )
+
+            cursor?.use {
+                if (!it.moveToFirst()) {
+                    Log.w("CalendarManager", "Event $eventId not found in calendar - may have been deleted")
+                    return false
+                }
+
+                val deletedIndex = it.getColumnIndex(CalendarContract.Events.DELETED)
+                val statusIndex = it.getColumnIndex(CalendarContract.Events.STATUS)
+                val startTimeIndex = it.getColumnIndex(CalendarContract.Events.DTSTART)
+
+                // Check if event is marked as deleted
+                if (deletedIndex >= 0 && it.getInt(deletedIndex) == 1) {
+                    Log.w("CalendarManager", "Event $eventId is marked as deleted")
+                    return false
+                }
+
+                // Check if event is canceled
+                if (statusIndex >= 0) {
+                    val status = it.getInt(statusIndex)
+                    if (status == CalendarContract.Events.STATUS_CANCELED) {
+                        Log.w("CalendarManager", "Event $eventId is canceled")
+                        return false
+                    }
+                }
+
+                // For non-recurring events, verify the start time matches
+                if (startTimeIndex >= 0) {
+                    val actualStartTime = it.getLong(startTimeIndex)
+                    // Allow 1 minute tolerance for time comparisons
+                    val timeDiff = Math.abs(actualStartTime - expectedStartTime)
+                    if (timeDiff > 60000) { // More than 1 minute difference
+                        Log.w("CalendarManager", "Event $eventId time changed: expected=$expectedStartTime, actual=$actualStartTime, diff=${timeDiff}ms")
+                        return false
+                    }
+                }
+
+                Log.d("CalendarManager", "Event $eventId verified - exists and is valid")
+                return true
+            }
+
+            Log.w("CalendarManager", "Failed to query event $eventId")
+            return false
+
+        } catch (e: Exception) {
+            Log.e("CalendarManager", "Error verifying event $eventId: ${e.message}", e)
+            return false
+        }
+    }
+
+    /**
      * Helper function to format timestamps for debugging
      */
     private fun formatTime(timestamp: Long): String {
