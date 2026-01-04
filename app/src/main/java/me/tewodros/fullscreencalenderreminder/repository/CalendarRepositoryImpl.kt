@@ -248,8 +248,19 @@ class CalendarRepositoryImpl(private val context: Context) : CalendarRepository 
         Dispatchers.IO,
     ) {
         try {
+            Log.d(
+                "CalendarRepository",
+                "🔔 scheduleReminder called: event='${event.title}' id=${event.id} " +
+                    "startTime=${formatTime(event.startTime)} reminderMinutes=$reminderMinutes",
+            )
+
             val reminderTime = event.startTime - (reminderMinutes * 60 * 1000L)
             val currentTime = System.currentTimeMillis()
+
+            Log.d(
+                "CalendarRepository",
+                "🔔 Calculated reminderTime=${formatTime(reminderTime)} currentTime=${formatTime(currentTime)}",
+            )
 
             if (reminderTime <= currentTime) {
                 Log.w(
@@ -259,14 +270,25 @@ class CalendarRepositoryImpl(private val context: Context) : CalendarRepository 
                 return@withContext
             }
 
+            // Determine reminder type based on minutes
+            val reminderType = when (reminderMinutes) {
+                0 -> "AT_EVENT_TIME"
+                else -> "REMINDER_${reminderMinutes}MIN"
+            }
+
             val intent = Intent(context, AlarmReceiver::class.java).apply {
                 putExtra("event_title", event.title)
                 putExtra("event_id", event.id)
+                putExtra("event_start_time", event.startTime)
+                putExtra("calendar_name", event.calendarName ?: "Unknown Calendar")
                 putExtra("reminder_minutes", reminderMinutes)
+                putExtra("reminder_type", reminderType)
+                // Add action to make intent unique
+                action = "REMINDER_ALARM_${event.id}_$reminderType"
             }
 
-            // Create unique request ID for each reminder (event_id + reminder_minutes)
-            val requestId = (event.id.toString() + reminderMinutes.toString()).hashCode()
+            // Create unique request ID for each reminder (event_id + reminder_type)
+            val requestId = "${event.id}_$reminderType".hashCode()
 
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
@@ -343,6 +365,91 @@ class CalendarRepositoryImpl(private val context: Context) : CalendarRepository 
         }
     }
 
+    /**
+     * Schedule a snooze reminder that won't be verified or cancelled by background processes
+     * @param event The event with startTime set to when the alarm should fire (snooze time)
+     * @param originalStartTime The original event start time for display purposes
+     */
+    override suspend fun scheduleSnoozeReminder(event: CalendarEvent, originalStartTime: Long) = withContext(
+        Dispatchers.IO,
+    ) {
+        try {
+            val snoozeTime = event.startTime
+            val currentTime = System.currentTimeMillis()
+
+            Log.d(
+                "CalendarRepository",
+                "🔔 scheduleSnoozeReminder called: event='${event.title}' id=${event.id} " +
+                    "snoozeTime=${formatTime(snoozeTime)} originalStartTime=${formatTime(originalStartTime)}",
+            )
+
+            if (snoozeTime <= currentTime) {
+                Log.w(
+                    "CalendarRepository",
+                    "⚠️ Snooze time has already passed for '${event.title}' - skipping",
+                )
+                return@withContext
+            }
+
+            // Use SNOOZE_ prefix to identify snooze alarms (they won't be verified)
+            // Use consistent timestamp to avoid ID mismatches
+            val snoozeTimestamp = System.currentTimeMillis()
+            val reminderType = "SNOOZE_$snoozeTimestamp"
+
+            val intent = Intent(context, AlarmReceiver::class.java).apply {
+                putExtra("event_title", event.title)
+                putExtra("event_id", event.id)
+                // Use ORIGINAL start time for display, not snooze time
+                putExtra("event_start_time", originalStartTime)
+                putExtra("calendar_name", event.calendarName ?: "Snoozed")
+                putExtra("reminder_minutes", 0)
+                putExtra("reminder_type", reminderType)
+                // Add action to make intent unique (use same timestamp)
+                action = "SNOOZE_ALARM_${event.id}_$snoozeTimestamp"
+            }
+
+            // Create unique request ID for snooze (use same timestamp)
+            val requestId = "SNOOZE_${event.id}_$snoozeTimestamp".hashCode()
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        snoozeTime,
+                        pendingIntent,
+                    )
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        snoozeTime,
+                        pendingIntent,
+                    )
+                }
+
+                Log.d(
+                    "CalendarRepository",
+                    "✅ Scheduled SNOOZE alarm for '${event.title}' at ${formatTime(snoozeTime)}",
+                )
+            } catch (e: SecurityException) {
+                Log.e("CalendarRepository", "Security error scheduling snooze alarm", e)
+                throw e
+            }
+        } catch (e: Exception) {
+            Log.e(
+                "CalendarRepository",
+                "❌ Failed to schedule snooze alarm for '${event.title}': ${e.message}",
+                e,
+            )
+        }
+    }
+
     override suspend fun scheduleAllReminders() = withContext(Dispatchers.IO) {
         Log.d("CalendarRepository", "🔔 Starting to schedule all calendar reminders...")
 
@@ -374,11 +481,7 @@ class CalendarRepositoryImpl(private val context: Context) : CalendarRepository 
         // Invalidate cache after scheduling to ensure fresh data next time
         invalidateCache()
 
-        Toast.makeText(
-            context,
-            "Scheduled $totalRemindersScheduled reminders for ${events.size} events",
-            Toast.LENGTH_LONG,
-        ).show()
+        Unit // Explicit return to match interface
     }
 
     override suspend fun cancelAllAlarms() = withContext(Dispatchers.IO) {

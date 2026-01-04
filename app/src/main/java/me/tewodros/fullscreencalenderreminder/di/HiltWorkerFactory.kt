@@ -7,15 +7,15 @@ import androidx.work.WorkerParameters
 import javax.inject.Inject
 import javax.inject.Singleton
 import me.tewodros.vibecalendaralarm.ReminderWorker
-import me.tewodros.vibecalendaralarm.repository.CalendarRepository
+import me.tewodros.vibecalendaralarm.repository.CalendarRepositoryV2
 
 /**
  * Custom WorkerFactory for Hilt dependency injection in Workers
- * Allows workers to receive injected dependencies
+ * Properly injects CalendarRepositoryV2 into ReminderWorker
  */
 @Singleton
 class HiltWorkerFactory @Inject constructor(
-    private val calendarRepository: CalendarRepository,
+    private val calendarRepository: CalendarRepositoryV2,
 ) : WorkerFactory() {
 
     override fun createWorker(
@@ -25,9 +25,11 @@ class HiltWorkerFactory @Inject constructor(
     ): ListenableWorker? {
         return when (workerClassName) {
             ReminderWorker::class.java.name -> {
-                ReminderWorker(appContext, workerParameters)
+                // Properly inject the repository into the worker
+                ReminderWorker(appContext, workerParameters, calendarRepository)
             }
             else -> null
         }
     }
 }
+

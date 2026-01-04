@@ -101,10 +101,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Setup FAB click listener
-        binding.fabRefresh.setOnClickListener {
+        // Setup SwipeRefreshLayout for pull-to-refresh
+        binding.swipeRefreshLayout.setOnRefreshListener {
             refreshEventsDisplay()
         }
+
+        // Set swipe refresh colors - multiple colors create the spinning animation
+        binding.swipeRefreshLayout.setColorSchemeColors(
+            getColor(android.R.color.holo_blue_bright),
+            getColor(android.R.color.holo_green_light),
+            getColor(android.R.color.holo_orange_light),
+            getColor(android.R.color.holo_red_light)
+        )
 
         // Initialize app (permissions already handled in onboarding)
         initializeAppDirectly()
@@ -118,11 +126,8 @@ class MainActivity : AppCompatActivity() {
 
         // Check for overlay permission and warn if missing
         if (!hasOverlayPermission()) {
-            Toast.makeText(
-                this,
-                "⚠️ Display Over Apps permission is required for alarms to show on lock screen. Please grant it in Settings.",
-                Toast.LENGTH_LONG
-            ).show()
+            // Permission warning shown via dialog instead of toast
+            Log.w("MainActivity", "Overlay permission not granted")
         }
 
         // Start background monitoring
@@ -188,11 +193,15 @@ class MainActivity : AppCompatActivity() {
     private fun refreshEventsDisplay() {
         Log.d("MainActivity", "Refreshing events display and scheduling alarms")
 
+        // Ensure the refresh indicator is showing
+        binding.swipeRefreshLayout.isRefreshing = true
+
         // Check if screenshot mode is enabled
         if (SettingsActivity.isScreenshotModeEnabled(this)) {
             Log.d("MainActivity", "📸 Screenshot mode enabled - showing fake events")
             displayFakeEvents()
-            Toast.makeText(this, "Screenshot mode - no actual scheduling", Toast.LENGTH_SHORT).show()
+            binding.swipeRefreshLayout.isRefreshing = false
+            Toast.makeText(this, "Screenshot mode active", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -200,13 +209,25 @@ class MainActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 try {
                     binding.statusText.text = "Loading events..."
-                    val events = calendarManager.getUpcomingEventsWithReminders()
+
+                    // Invalidate cache to force fresh data on user-initiated refresh
+                    calendarManager.invalidateCache()
+                    Log.d("MainActivity", "Cache invalidated - fetching fresh events")
+
+                    // Run calendar query on IO thread to allow spinner to animate
+                    val events = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        calendarManager.getUpcomingEventsWithReminders()
+                    }
+                    Log.d("MainActivity", "Fetched ${events.size} events from calendar")
 
                     // Limit events to display
                     val totalEvents = events.size
                     val eventsToDisplay = events.take(MAX_EVENTS_TO_DISPLAY)
 
-                    eventAdapter.submitList(eventsToDisplay)
+                    // Force adapter to update by submitting a new list copy
+                    eventAdapter.submitList(eventsToDisplay.toList()) {
+                        Log.d("MainActivity", "Adapter updated with ${eventsToDisplay.size} events")
+                    }
                     updateEventsCount(totalEvents)
 
                     // Show "view more" message if there are more events than displayed
@@ -225,7 +246,7 @@ class MainActivity : AppCompatActivity() {
                         try {
                             calendarManager.scheduleAllReminders()
                             binding.statusText.text = "Scheduled alarms for $totalEvents events"
-                            Toast.makeText(this@MainActivity, "Alarms scheduled for $totalEvents events", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, "Reminders scheduled", Toast.LENGTH_SHORT).show()
 
                             // Save the time we did scheduling
                             getSharedPreferences("alarm_prefs", MODE_PRIVATE)
@@ -235,23 +256,26 @@ class MainActivity : AppCompatActivity() {
                         } catch (e: Exception) {
                             Log.e("MainActivity", "Scheduling failed: ${e.message}")
                             binding.statusText.text = "Error scheduling alarms"
-                            Toast.makeText(this@MainActivity, "Error scheduling alarms: ${e.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, "Could not schedule reminders. Please try again.", Toast.LENGTH_LONG).show()
                         }
                     } else if (events.isEmpty()) {
-                        binding.statusText.text = "No events found with reminders"
-                        Toast.makeText(this@MainActivity, "No events found", Toast.LENGTH_SHORT).show()
+                        binding.statusText.text = "No upcoming events found"
                     } else {
                         Log.w("MainActivity", "Events found but missing permissions for scheduling")
-                        binding.statusText.text = "Missing permissions for alarm scheduling"
-                        Toast.makeText(this@MainActivity, "Missing alarm permission", Toast.LENGTH_SHORT).show()
+                        binding.statusText.text = "Alarm permission required"
+                        Toast.makeText(this@MainActivity, "Please grant alarm permission in Settings", Toast.LENGTH_LONG).show()
                     }
                 } catch (e: Exception) {
                     Log.e("MainActivity", "Error loading events: ${e.message}")
                     binding.statusText.text = "Error loading events: ${e.message}"
+                } finally {
+                    // Stop the refresh indicator
+                    binding.swipeRefreshLayout.isRefreshing = false
                 }
             }
         } else {
             Log.w("MainActivity", "⚠️ Cannot refresh events - missing calendar permission")
+            binding.swipeRefreshLayout.isRefreshing = false
         }
     }
 
@@ -334,7 +358,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 startActivity(intent)
             } catch (e2: Exception) {
-                Toast.makeText(this, "No calendar app found", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "No calendar app installed", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -401,7 +425,7 @@ class MainActivity : AppCompatActivity() {
                     .setNegativeButton("Skip (Not Recommended)") { _, _ ->
                         Toast.makeText(
                             this,
-                            "⚠️ Reminders may not work reliably without fixing battery optimization",
+                            "Reminders may be delayed without battery optimization disabled",
                             Toast.LENGTH_LONG,
                         ).show()
                     }
@@ -425,11 +449,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 startActivity(intent)
 
-                Toast.makeText(
-                    this,
-                    "📱 Select 'Allow' to fix alarm reliability",
-                    Toast.LENGTH_LONG,
-                ).show()
+                // Instruction shown in dialog, no toast needed
             }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error opening battery optimization settings: ${e.message}")
@@ -440,14 +460,14 @@ class MainActivity : AppCompatActivity() {
                 startActivity(fallbackIntent)
                 Toast.makeText(
                     this,
-                    "📱 Find this app and select 'Don't optimize'",
+                    "Find this app and select 'Don't optimize'",
                     Toast.LENGTH_LONG,
                 ).show()
             } catch (e2: Exception) {
                 Log.e("MainActivity", "Error opening fallback battery settings: ${e2.message}")
                 Toast.makeText(
                     this,
-                    "❌ Please manually disable battery optimization in Settings > Apps",
+                    "Please disable battery optimization in Settings > Apps",
                     Toast.LENGTH_LONG,
                 ).show()
             }
@@ -512,7 +532,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 Toast.makeText(
                     this,
-                    "⚠️ Alarms may not work reliably without display permission",
+                    "Reminders won't appear on lock screen without display permission",
                     Toast.LENGTH_LONG,
                 ).show()
                 checkPermissionsAndInitialize()
@@ -556,7 +576,7 @@ class MainActivity : AppCompatActivity() {
                 .setNegativeButton("Skip (Alarms Won't Work)") { _, _ ->
                     Toast.makeText(
                         this,
-                        "⚠️ Alarms will NOT work reliably without display permission",
+                        "Reminders won't appear on lock screen without this permission",
                         Toast.LENGTH_LONG,
                     ).show()
                     // Reset ask count if user grants other permissions

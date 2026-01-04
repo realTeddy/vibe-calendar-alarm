@@ -195,7 +195,7 @@ ktlint {
     android.set(true)
     outputToConsole.set(true)
     outputColorName.set("RED")
-    ignoreFailures.set(true)  // Temporarily ignore failures to get CI working
+    ignoreFailures.set(false)  // Fail build on style violations
     filter {
         exclude("**/build/**")
     }
@@ -206,7 +206,7 @@ detekt {
     toolVersion = "1.23.3"
     config.setFrom(file("$rootDir/config/detekt/detekt.yml"))
     buildUponDefaultConfig = true
-    ignoreFailures = true
+    ignoreFailures = false  // Fail build on code quality issues
 }
 
 dependencies {
@@ -216,6 +216,9 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.work.runtime.ktx)
+
+    // SwipeRefreshLayout for pull-to-refresh
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
     // Modern coroutines and lifecycle support for performance
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0")

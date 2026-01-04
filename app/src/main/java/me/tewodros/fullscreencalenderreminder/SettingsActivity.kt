@@ -372,13 +372,7 @@ class SettingsActivity : AppCompatActivity() {
                 if (isChecked) {
                     Toast.makeText(
                         this@SettingsActivity,
-                        "📸 Screenshot mode enabled - showing fake events",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                } else {
-                    Toast.makeText(
-                        this@SettingsActivity,
-                        "📅 Showing real calendar events",
+                        "Screenshot mode enabled",
                         Toast.LENGTH_SHORT,
                     ).show()
                 }
@@ -636,7 +630,7 @@ class SettingsActivity : AppCompatActivity() {
 
         Toast.makeText(
             this,
-            "⏰ Alarm scheduled for 10 seconds from now",
+            "Test alarm scheduled for 10 seconds",
             Toast.LENGTH_SHORT
         ).show()
     }

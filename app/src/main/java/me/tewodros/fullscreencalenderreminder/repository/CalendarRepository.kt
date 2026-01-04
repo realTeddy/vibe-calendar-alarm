@@ -56,4 +56,12 @@ interface CalendarRepository {
      * Invalidate any cached data
      */
     fun invalidateCache()
+
+    /**
+     * Schedule a snooze reminder for an event
+     * Snooze reminders are NOT verified against the calendar and won't be cancelled
+     * @param event The calendar event with startTime set to the snooze time
+     * @param originalStartTime The original event start time for display purposes
+     */
+    suspend fun scheduleSnoozeReminder(event: CalendarEvent, originalStartTime: Long)
 }

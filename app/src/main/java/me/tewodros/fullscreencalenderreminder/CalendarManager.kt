@@ -415,11 +415,6 @@ class CalendarManager(private val context: Context) {
                 "CalendarManager",
                 "$type reminder time is in the past or too soon, skipping: ${event.title}",
             )
-            Toast.makeText(
-                context,
-                "⚠️ Skipped $type reminder (too soon): ${event.title}",
-                Toast.LENGTH_SHORT,
-            ).show()
             return
         }
 
@@ -429,43 +424,56 @@ class CalendarManager(private val context: Context) {
                 Log.e("CalendarManager", "❌ Cannot schedule exact alarms - permission not granted")
                 Toast.makeText(
                     context,
-                    "❌ Exact alarm permission required for precise reminders",
+                    "Alarm permission required for reminders",
                     Toast.LENGTH_LONG,
                 ).show()
                 return
             }
         }
 
-        // Try to schedule with retry logic
-        var attempts = 0
-        val maxAttempts = 3
-        var success = false
-
-        while (attempts < maxAttempts && !success) {
-            attempts++
-            Log.d("CalendarManager", "Scheduling attempt $attempts/$maxAttempts for $type")
-
-            success = attemptAlarmScheduling(event, reminderTime, type, attempts)
-
-            if (!success && attempts < maxAttempts) {
-                Log.w("CalendarManager", "Attempt $attempts failed, waiting before retry...")
-                try {
-                    Thread.sleep(500) // Wait 500ms before retry
-                } catch (e: InterruptedException) {
-                    Log.e("CalendarManager", "Sleep interrupted: ${e.message}")
-                    break
-                }
-            }
-        }
+        // Try to schedule - single attempt first
+        Log.d("CalendarManager", "Scheduling attempt 1/3 for $type")
+        var success = attemptAlarmScheduling(event, reminderTime, type, 1)
 
         if (success) {
             Log.d(
                 "CalendarManager",
-                "✅ $type alarm scheduled successfully after $attempts attempts",
+                "✅ $type alarm scheduled successfully on first attempt",
             )
+            return
+        }
+
+        // If first attempt failed, schedule retries on a background thread to avoid blocking main thread
+        Log.w("CalendarManager", "First attempt failed, scheduling background retries...")
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            retryAlarmSchedulingAsync(event, reminderTime, type, 2)
+        }, 500L) // 500ms delay before first retry
+    }
+
+    /**
+     * Async retry scheduling to avoid blocking main thread
+     */
+    private fun retryAlarmSchedulingAsync(
+        event: CalendarEvent,
+        reminderTime: Long,
+        type: String,
+        attempt: Int
+    ) {
+        Log.d("CalendarManager", "Scheduling attempt $attempt/3 for $type")
+        val success = attemptAlarmScheduling(event, reminderTime, type, attempt)
+
+        if (success) {
+            Log.d(
+                "CalendarManager",
+                "✅ $type alarm scheduled successfully after $attempt attempts",
+            )
+        } else if (attempt < 3) {
+            // Schedule another retry
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                retryAlarmSchedulingAsync(event, reminderTime, type, attempt + 1)
+            }, 500L)
         } else {
-            Log.e("CalendarManager", "❌ Failed to schedule $type alarm after $maxAttempts attempts")
-            Toast.makeText(context, "❌ Failed to schedule $type: ${event.title}", Toast.LENGTH_LONG).show()
+            Log.e("CalendarManager", "❌ Failed to schedule $type alarm after 3 attempts")
         }
     }
 
@@ -567,13 +575,6 @@ class CalendarManager(private val context: Context) {
                         "CalendarManager",
                         "✅ VERIFICATION SUCCESS: $type alarm is registered in system (attempt $attempt)",
                     )
-                    if (attempt == 1) {
-                        Toast.makeText(
-                            context,
-                            "✅ Scheduled $type: ${event.title}",
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
                     return true // Success!
                 } else {
                     Log.e(
@@ -581,13 +582,6 @@ class CalendarManager(private val context: Context) {
                         "❌ VERIFICATION FAILED: $type alarm NOT found in system after scheduling (attempt $attempt)",
                     )
                     Log.e("CalendarManager", "This means AlarmManager silently rejected the alarm!")
-                    if (attempt == 1) {
-                        Toast.makeText(
-                            context,
-                            "❌ FAILED $type: ${event.title} - Check battery optimization",
-                            Toast.LENGTH_LONG,
-                        ).show()
-                    }
                     return false // Failed verification
                 }
             } catch (e: SecurityException) {
@@ -596,26 +590,12 @@ class CalendarManager(private val context: Context) {
                     "❌ SecurityException scheduling $type alarm (attempt $attempt): ${e.message}",
                 )
                 Log.e("CalendarManager", "This usually means exact alarm permission is missing")
-                if (attempt == 1) {
-                    Toast.makeText(
-                        context,
-                        "Permission denied $type: ${event.title}",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
                 return false
             } catch (e: Exception) {
                 Log.e(
                     "CalendarManager",
                     "❌ Unexpected exception scheduling $type alarm (attempt $attempt): ${e.message}",
                 )
-                if (attempt == 1) {
-                    Toast.makeText(
-                        context,
-                        "Error scheduling $type: ${event.title}",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
                 return false
             }
         } catch (e: Exception) {
@@ -662,7 +642,6 @@ class CalendarManager(private val context: Context) {
 
         if (events.isEmpty()) {
             Log.w("CalendarManager", "No events found with reminders")
-            Toast.makeText(context, "No upcoming events with reminders found", Toast.LENGTH_LONG).show()
             return
         }
 
@@ -731,22 +710,11 @@ class CalendarManager(private val context: Context) {
 
         val cleanupMessage = if (cleanedCount > 0) " (cleaned $cleanedCount orphaned alarms)" else ""
 
-        if (scheduledCount > 0) {
+        // Only show toast if something was scheduled or cleaned
+        if (scheduledCount > 0 || cleanedCount > 0) {
             Toast.makeText(
                 context,
-                "Scheduled $scheduledCount new reminders$cleanupMessage",
-                Toast.LENGTH_LONG,
-            ).show()
-        } else if (alreadyScheduledCount > 0) {
-            Toast.makeText(
-                context,
-                "All $alreadyScheduledCount reminders already scheduled$cleanupMessage",
-                Toast.LENGTH_SHORT,
-            ).show()
-        } else {
-            Toast.makeText(
-                context,
-                "No new reminders to schedule$cleanupMessage",
+                "Reminders updated",
                 Toast.LENGTH_SHORT,
             ).show()
         }

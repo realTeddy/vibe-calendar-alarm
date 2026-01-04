@@ -226,27 +226,35 @@ class ReminderActivity : AppCompatActivity() {
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
-            mediaPlayer = MediaPlayer().apply {
-                setDataSource(this@ReminderActivity, alarmUri)
-                setAudioAttributes(
+            val player = MediaPlayer()
+            try {
+                player.setDataSource(this@ReminderActivity, alarmUri)
+                player.setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build(),
                 )
-                isLooping = true
+                player.isLooping = true
 
                 // Start with extremely low volume (barely audible - 1%)
-                setVolume(0.01f, 0.01f)
+                player.setVolume(0.01f, 0.01f)
 
-                prepare()
-                start()
+                player.prepare()
+                player.start()
+
+                mediaPlayer = player
 
                 // Start gradual volume increase
                 startVolumeGradualIncrease()
+            } catch (e: Exception) {
+                // Release player on any setup error to prevent resource leak
+                player.release()
+                throw e
             }
         } catch (e: Exception) {
             Log.e("ReminderActivity", "Error playing alarm sound: ${e.message}")
+            mediaPlayer = null
         }
     }
 
@@ -270,6 +278,10 @@ class ReminderActivity : AppCompatActivity() {
      * Gradually increase alarm volume from almost silent to system alarm volume over 30 seconds
      */
     private fun startVolumeGradualIncrease() {
+        // Cancel any existing volume fade to prevent multiple runnables
+        volumeFadeRunnable?.let { volumeFadeHandler.removeCallbacks(it) }
+        volumeFadeRunnable = null
+
         val totalSteps = (fadeInDurationMs / fadeStepMs).toInt()
         var currentStep = 0
 
@@ -628,30 +640,37 @@ class ReminderActivity : AppCompatActivity() {
      * Snooze a specific event
      */
     private fun snoozeEvent(alarm: PendingAlarmsManager.PendingAlarm, minutes: Int) {
+        Log.d(TAG, "🔔 snoozeEvent called: eventId=${alarm.eventId} title='${alarm.eventTitle}' minutes=$minutes")
         lifecycleScope.launch {
             try {
                 // Create a snooze time
                 val snoozeTime = System.currentTimeMillis() + (minutes * 60 * 1000)
+                Log.d(TAG, "🔔 Snooze time calculated: ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(snoozeTime))}")
 
                 // Create a temporary event for the snooze
+                // Note: startTime is set to snoozeTime for alarm scheduling,
+                // but originalStartTime is passed separately for display purposes
                 val snoozeEvent = me.tewodros.vibecalendaralarm.model.CalendarEvent(
                     id = alarm.eventId,
                     title = alarm.eventTitle,
                     startTime = snoozeTime,
-                    reminderMinutes = emptyList() // No reminder offset since we want it to fire at snoozeTime
+                    reminderMinutes = emptyList(),
+                    calendarName = alarm.calendarName
                 )
 
-                // Schedule a reminder 0 minutes before the snooze time (immediate)
-                calendarRepository.scheduleReminder(snoozeEvent, 0)
+                Log.d(TAG, "🔔 Calling calendarRepository.scheduleSnoozeReminder")
+                // Schedule a snooze reminder with original event start time for display
+                calendarRepository.scheduleSnoozeReminder(snoozeEvent, alarm.eventStartTime)
+                Log.d(TAG, "🔔 scheduleSnoozeReminder completed")
 
                 // Remove from pending queue
                 PendingAlarmsManager.removeAlarm(alarm.eventId, alarm.reminderType)
                 // Activity callback will handle UI update
 
-                Toast.makeText(this@ReminderActivity, "Snoozed for $minutes minutes", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@ReminderActivity, "Reminder snoozed", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to snooze event ${alarm.eventId}", e)
-                Toast.makeText(this@ReminderActivity, "Failed to snooze reminder", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@ReminderActivity, "Could not snooze reminder", Toast.LENGTH_SHORT).show()
             }
         }
     }

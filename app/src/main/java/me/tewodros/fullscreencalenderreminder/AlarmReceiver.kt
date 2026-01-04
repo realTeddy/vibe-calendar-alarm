@@ -8,46 +8,56 @@ import android.widget.Toast
 
 /**
  * Receives alarm broadcasts and launches the full-screen reminder activity
- * Keeps it simple - just launch the activity with event details
+ * Includes input validation to prevent crashes from malformed intents
  */
 class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d("AlarmReceiver", "=== ALARM FIRED ===")
+        Log.d(TAG, "=== ALARM FIRED ===")
 
-        // Extract event details from the alarm intent
-        val eventId = intent.getLongExtra("event_id", -1)
-        val eventTitle = intent.getStringExtra("event_title") ?: "Reminder"
-        val eventStartTime = intent.getLongExtra("event_start_time", 0)
-        val calendarName = intent.getStringExtra("calendar_name") ?: "Unknown Calendar"
-        val reminderType = intent.getStringExtra("reminder_type") ?: "UNKNOWN"
+        // Extract and validate event details from the alarm intent
+        val eventId = intent.getLongExtra("event_id", INVALID_EVENT_ID)
+        val eventTitle = intent.getStringExtra("event_title")?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_TITLE
+        val eventStartTime = intent.getLongExtra("event_start_time", INVALID_TIME)
+        val calendarName = intent.getStringExtra("calendar_name")?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_CALENDAR
+        val reminderType = intent.getStringExtra("reminder_type")?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_TYPE
         val action = intent.action ?: "NO_ACTION"
 
+        // Validate required fields
+        if (!validateAlarmData(eventId, eventTitle, action)) {
+            Log.e(TAG, "❌ Invalid alarm data - aborting")
+            return
+        }
+
         Log.d(
-            "AlarmReceiver",
+            TAG,
             "Event details: ID=$eventId, Title='$eventTitle', StartTime=$eventStartTime, Calendar='$calendarName'",
         )
-        Log.d("AlarmReceiver", "Alarm type: $reminderType, Action: $action")
-        Log.d("AlarmReceiver", "Current time: ${System.currentTimeMillis()}")
+        Log.d(TAG, "Alarm type: $reminderType, Action: $action")
+        Log.d(TAG, "Current time: ${System.currentTimeMillis()}")
 
         // Verify the event still exists in the calendar before showing reminder
-        // Skip verification for snoozed alarms (they don't have reminderType set properly)
-        val isSnoozedAlarm = eventStartTime == 0L || reminderType == "UNKNOWN"
+        // Skip verification for snoozed alarms or alarms without valid start time
+        val isSnoozeAlarm = reminderType?.startsWith("SNOOZE_") == true
+        val shouldVerify = eventStartTime > 0 && reminderType != DEFAULT_TYPE && !isSnoozeAlarm
 
-        if (!isSnoozedAlarm) {
+        if (shouldVerify) {
             val calendarManager = CalendarManager(context)
             if (!calendarManager.verifyEventExists(eventId, eventStartTime)) {
                 Log.w(
-                    "AlarmReceiver",
-                    "⚠️ Event $eventId no longer exists or has been modified - skipping reminder"
+                    TAG,
+                    "⚠️ Event $eventId no longer exists or has been modified - skipping reminder",
                 )
                 // Cancel any remaining alarms for this event
                 calendarManager.cancelReminder(eventId)
                 return
             }
-            Log.d("AlarmReceiver", "✓ Event verified - continuing with reminder")
+            Log.d(TAG, "✓ Event verified - continuing with reminder")
         } else {
-            Log.d("AlarmReceiver", "⏰ Snoozed alarm detected - skipping verification")
+            Log.d(TAG, "⏰ Skipping verification (snoozed or invalid start time)")
         }
 
         // Create pending alarm object
@@ -56,7 +66,7 @@ class AlarmReceiver : BroadcastReceiver() {
             eventTitle = eventTitle,
             eventStartTime = eventStartTime,
             reminderType = reminderType,
-            calendarName = calendarName
+            calendarName = calendarName,
         )
 
         // Add to pending alarms queue
@@ -64,17 +74,54 @@ class AlarmReceiver : BroadcastReceiver() {
 
         // Check if ReminderActivity is already active
         if (PendingAlarmsManager.isActivityActive()) {
-            Log.d("AlarmReceiver", "✓ ReminderActivity is already active, alarm added to queue")
-            // Activity will be notified automatically through callback
+            Log.d(TAG, "✓ ReminderActivity is already active, alarm added to queue")
+            // Activity will be notified automatically through callback/StateFlow
             return
         }
 
         // Launch ReminderActivity if not already active
-        Log.d("AlarmReceiver", "🚀 Launching new ReminderActivity...")
+        launchReminderActivity(context, eventId, eventTitle, eventStartTime, reminderType)
 
-        // Create intent to launch full-screen reminder activity
+        Log.d(TAG, "=== ALARM PROCESSING COMPLETE ===")
+    }
+
+    /**
+     * Validate alarm data to prevent crashes from malformed intents
+     */
+    private fun validateAlarmData(eventId: Long, eventTitle: String, action: String): Boolean {
+        // Event ID must be valid (not -1)
+        if (eventId == INVALID_EVENT_ID) {
+            Log.e(TAG, "Invalid event ID: $eventId")
+            return false
+        }
+
+        // Event title should exist (we have a fallback but log if missing)
+        if (eventTitle == DEFAULT_TITLE) {
+            Log.w(TAG, "Event title was missing, using default")
+        }
+
+        // Action should match our expected pattern
+        if (!action.startsWith("REMINDER_ALARM_") && action != "NO_ACTION") {
+            Log.w(TAG, "Unexpected action format: $action")
+            // Still allow - could be a snoozed alarm
+        }
+
+        return true
+    }
+
+    /**
+     * Launch the ReminderActivity with proper flags
+     */
+    private fun launchReminderActivity(
+        context: Context,
+        eventId: Long,
+        eventTitle: String,
+        eventStartTime: Long,
+        reminderType: String,
+    ) {
+        Log.d(TAG, "🚀 Launching new ReminderActivity...")
+
         val reminderIntent = Intent(context, ReminderActivity::class.java).apply {
-            // Simplified flags - allow multiple events in one activity
             // FLAG_ACTIVITY_NEW_TASK: Required for launching from BroadcastReceiver
             // FLAG_ACTIVITY_NO_USER_ACTION: Don't trigger user action events
             // FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS: Don't show in recent apps
@@ -82,7 +129,6 @@ class AlarmReceiver : BroadcastReceiver() {
                 Intent.FLAG_ACTIVITY_NO_USER_ACTION or
                 Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
 
-            // Pass event details to the activity
             putExtra("event_id", eventId)
             putExtra("event_title", eventTitle)
             putExtra("event_start_time", eventStartTime)
@@ -90,26 +136,28 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         try {
-            // Launch the reminder activity
-            Log.d("AlarmReceiver", "🚀 Attempting to launch ReminderActivity...")
-            Log.d("AlarmReceiver", "Intent flags: ${reminderIntent.flags}")
-
             context.startActivity(reminderIntent)
             Log.d(
-                "AlarmReceiver",
-                "✅ startActivity() call completed successfully for $reminderType alarm of '$eventTitle'",
+                TAG,
+                "✅ ReminderActivity launched for '$eventTitle' ($reminderType)",
             )
         } catch (e: Exception) {
-            Log.e("AlarmReceiver", "❌ Failed to launch ReminderActivity: ${e.message}")
-            Log.e("AlarmReceiver", "Exception type: ${e.javaClass.simpleName}")
-            Log.e("AlarmReceiver", "Stack trace:", e)
-            // Show a more persistent notification as fallback
+            Log.e(TAG, "❌ Failed to launch ReminderActivity: ${e.message}", e)
+            // Show fallback notification
             Toast.makeText(
                 context,
-                "⚠️ ALARM: $eventTitle - Check app settings for 'Display over other apps'",
+                "⚠️ ALARM: $eventTitle - Enable 'Display over other apps' in settings",
                 Toast.LENGTH_LONG,
             ).show()
         }
-        Log.d("AlarmReceiver", "=== ALARM PROCESSING COMPLETE ===")
+    }
+
+    companion object {
+        private const val TAG = "AlarmReceiver"
+        private const val INVALID_EVENT_ID = -1L
+        private const val INVALID_TIME = 0L
+        private const val DEFAULT_TITLE = "Reminder"
+        private const val DEFAULT_CALENDAR = "Unknown Calendar"
+        private const val DEFAULT_TYPE = "UNKNOWN"
     }
 }

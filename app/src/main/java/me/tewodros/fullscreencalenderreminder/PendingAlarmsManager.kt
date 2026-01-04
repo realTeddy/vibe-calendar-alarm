@@ -1,10 +1,16 @@
 package me.tewodros.vibecalendaralarm
 
 import android.util.Log
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * Singleton manager for handling multiple pending alarm events.
- * Allows multiple alarms to be displayed in a single ReminderActivity.
+ * Uses ConcurrentHashMap for thread-safe access without synchronized blocks.
+ * Emits updates via StateFlow to avoid callback-related deadlocks.
  */
 object PendingAlarmsManager {
 
@@ -16,105 +22,124 @@ object PendingAlarmsManager {
         val eventTitle: String,
         val eventStartTime: Long,
         val reminderType: String,
-        val calendarName: String = "Unknown Calendar", // Name of the calendar this event belongs to
-        val timestamp: Long = System.currentTimeMillis() // When alarm was triggered
-    )
+        val calendarName: String = "Unknown Calendar",
+        val timestamp: Long = System.currentTimeMillis(),
+    ) {
+        /**
+         * Generate a unique key for this alarm
+         */
+        val key: String get() = "${eventId}_$reminderType"
+    }
 
-    private val pendingAlarms = mutableListOf<PendingAlarm>()
-    private var activeActivityCallback: ((List<PendingAlarm>) -> Unit)? = null
+    // Thread-safe map using ConcurrentHashMap - no synchronized blocks needed
+    private val pendingAlarmsMap = ConcurrentHashMap<String, PendingAlarm>()
+
+    // StateFlow for reactive updates - observers collect this instead of using callbacks
+    private val _alarmsFlow = MutableStateFlow<List<PendingAlarm>>(emptyList())
+    val alarmsFlow: StateFlow<List<PendingAlarm>> = _alarmsFlow.asStateFlow()
+
+    // Legacy callback support (for gradual migration)
+    @Volatile
+    private var legacyCallback: ((List<PendingAlarm>) -> Unit)? = null
 
     /**
      * Add a new alarm to the queue
      */
-    @Synchronized
     fun addAlarm(alarm: PendingAlarm) {
-        Log.d("PendingAlarmsManager", "Adding alarm: ${alarm.eventTitle} (ID: ${alarm.eventId})")
+        Log.d(TAG, "Adding alarm: ${alarm.eventTitle} (ID: ${alarm.eventId})")
 
-        // Check if this alarm already exists (prevent duplicates)
-        val exists = pendingAlarms.any {
-            it.eventId == alarm.eventId && it.reminderType == alarm.reminderType
-        }
+        // putIfAbsent returns null if key didn't exist (alarm was added)
+        val existing = pendingAlarmsMap.putIfAbsent(alarm.key, alarm)
 
-        if (!exists) {
-            pendingAlarms.add(alarm)
-            Log.d("PendingAlarmsManager", "Alarm added. Total pending: ${pendingAlarms.size}")
-
-            // Notify active activity if present
-            activeActivityCallback?.invoke(getAllAlarms())
+        if (existing == null) {
+            Log.d(TAG, "Alarm added. Total pending: ${pendingAlarmsMap.size}")
+            emitUpdate()
         } else {
-            Log.d("PendingAlarmsManager", "Alarm already exists, skipping duplicate")
+            Log.d(TAG, "Alarm already exists, skipping duplicate")
         }
     }
 
     /**
      * Remove an alarm from the queue
      */
-    @Synchronized
     fun removeAlarm(eventId: Long, reminderType: String) {
-        Log.d("PendingAlarmsManager", "Removing alarm: eventId=$eventId, type=$reminderType")
+        val key = "${eventId}_$reminderType"
+        Log.d(TAG, "Removing alarm: eventId=$eventId, type=$reminderType")
 
-        val removed = pendingAlarms.removeAll {
-            it.eventId == eventId && it.reminderType == reminderType
-        }
+        val removed = pendingAlarmsMap.remove(key)
 
-        if (removed) {
-            Log.d("PendingAlarmsManager", "Alarm removed. Remaining: ${pendingAlarms.size}")
-
-            // Notify active activity
-            activeActivityCallback?.invoke(getAllAlarms())
+        if (removed != null) {
+            Log.d(TAG, "Alarm removed. Remaining: ${pendingAlarmsMap.size}")
+            emitUpdate()
         }
     }
 
     /**
-     * Get all pending alarms
+     * Get all pending alarms (snapshot)
      */
-    @Synchronized
     fun getAllAlarms(): List<PendingAlarm> {
-        return pendingAlarms.toList()
+        return pendingAlarmsMap.values.toList()
     }
 
     /**
      * Check if there are any pending alarms
      */
-    @Synchronized
     fun hasPendingAlarms(): Boolean {
-        return pendingAlarms.isNotEmpty()
+        return pendingAlarmsMap.isNotEmpty()
     }
 
     /**
      * Clear all pending alarms
      */
-    @Synchronized
     fun clearAll() {
-        Log.d("PendingAlarmsManager", "Clearing all ${pendingAlarms.size} pending alarms")
-        pendingAlarms.clear()
-        activeActivityCallback?.invoke(emptyList())
+        Log.d(TAG, "Clearing all ${pendingAlarmsMap.size} pending alarms")
+        pendingAlarmsMap.clear()
+        emitUpdate()
     }
 
     /**
-     * Register callback for when the active ReminderActivity needs updates
+     * Register callback for legacy support
+     * @deprecated Use alarmsFlow.collect() instead
      */
-    @Synchronized
+    @Deprecated("Use alarmsFlow.collect() instead for reactive updates")
     fun registerActivityCallback(callback: (List<PendingAlarm>) -> Unit) {
-        Log.d("PendingAlarmsManager", "Activity callback registered")
-        activeActivityCallback = callback
-        // Immediately send current alarms to the activity
+        Log.d(TAG, "Legacy activity callback registered")
+        legacyCallback = callback
+        // Immediately send current alarms
         callback(getAllAlarms())
     }
 
     /**
-     * Unregister the activity callback
+     * Unregister the legacy activity callback
+     * @deprecated Use alarmsFlow.collect() instead
      */
-    @Synchronized
+    @Deprecated("Use alarmsFlow.collect() instead for reactive updates")
     fun unregisterActivityCallback() {
-        Log.d("PendingAlarmsManager", "Activity callback unregistered")
-        activeActivityCallback = null
+        Log.d(TAG, "Legacy activity callback unregistered")
+        legacyCallback = null
     }
 
     /**
-     * Check if an activity is currently active
+     * Check if a legacy activity callback is registered
      */
     fun isActivityActive(): Boolean {
-        return activeActivityCallback != null
+        return legacyCallback != null
     }
+
+    /**
+     * Emit update to StateFlow and legacy callback
+     */
+    private fun emitUpdate() {
+        // Take snapshot immediately to avoid TOCTOU race condition
+        val alarms = pendingAlarmsMap.values.toList()
+
+        // Update StateFlow (main reactive mechanism) - use direct assignment for atomicity
+        _alarmsFlow.value = alarms
+
+        // Also notify legacy callback if registered
+        legacyCallback?.invoke(alarms)
+    }
+
+    private const val TAG = "PendingAlarmsManager"
 }
+

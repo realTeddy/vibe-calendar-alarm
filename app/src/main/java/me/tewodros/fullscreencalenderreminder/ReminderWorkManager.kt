@@ -4,16 +4,16 @@ import android.content.Context
 import android.util.Log
 import androidx.work.*
 import java.util.concurrent.TimeUnit
+import me.tewodros.vibecalendaralarm.data.Constants
 
 /**
  * Manages reliable background calendar monitoring using WorkManager
  * This is the most robust approach for modern Android versions
- * Now includes adaptive scheduling for better battery performance
+ * Uses 1-minute intervals to catch newly added events quickly
  */
 object ReminderWorkManager {
 
     private const val WORK_NAME = "ReminderBackgroundWork"
-    private const val BACKGROUND_CHECK_INTERVAL_MINUTES = 5L // Balanced 5-minute intervals using OneTimeWork
 
     /**
      * Start frequent background monitoring using self-scheduling OneTimeWork
@@ -26,7 +26,7 @@ object ReminderWorkManager {
         )
         Log.d(
             "ReminderWorkManager",
-            "Using self-scheduling OneTimeWork for $BACKGROUND_CHECK_INTERVAL_MINUTES minute intervals",
+            "Using self-scheduling OneTimeWork for ${Constants.BACKGROUND_CHECK_INTERVAL_MINUTES} minute intervals",
         )
 
         // Cancel any existing work first
@@ -50,7 +50,7 @@ object ReminderWorkManager {
 
         val workRequest = OneTimeWorkRequestBuilder<ReminderWorker>()
             .setConstraints(constraints)
-            .setInitialDelay(BACKGROUND_CHECK_INTERVAL_MINUTES, TimeUnit.MINUTES)
+            .setInitialDelay(Constants.BACKGROUND_CHECK_INTERVAL_MINUTES, TimeUnit.MINUTES)
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
@@ -61,7 +61,7 @@ object ReminderWorkManager {
 
         Log.d(
             "ReminderWorkManager",
-            "⏰ Next background check scheduled in $BACKGROUND_CHECK_INTERVAL_MINUTES minute(s)",
+            "⏰ Next background check scheduled in ${Constants.BACKGROUND_CHECK_INTERVAL_MINUTES} minute(s)",
         )
     }
 
